@@ -7,7 +7,6 @@
     "icon": "./assets/images/icon.png",
     "scheme": "safetify",
     "userInterfaceStyle": "dark",
-    "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.safetify.app",
@@ -60,10 +59,6 @@
       ],
       "expo-web-browser"
     ],
-    "experiments": {
-      "typedRoutes": true,
-      "reactCompiler": true
-    },
     "extra": {
       "router": {},
       "eas": {
