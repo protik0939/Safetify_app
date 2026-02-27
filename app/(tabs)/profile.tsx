@@ -1,9 +1,10 @@
-import React from 'react';
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
-import { useRouter } from 'expo-router';
-import { useAppStore } from '../../store/useAppStore';
+import { lastSectionStyle } from '@/constants/theme';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
+import React from 'react';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Toast from 'react-native-toast-message';
+import { useAppStore } from '../../store/useAppStore';
 
 export default function ProfileScreen() {
   const router = useRouter();
@@ -34,19 +35,19 @@ export default function ProfileScreen() {
               </View>
               <Text style={styles.userName}>{user.name}</Text>
               <Text style={styles.userEmail}>{user.email}</Text>
-              
+
               <View style={styles.riskScoreContainer}>
                 <Text style={styles.riskScoreLabel}>Safety Score</Text>
                 <Text style={styles.riskScoreValue}>{user.riskScore}/100</Text>
                 <View style={styles.riskScoreBar}>
-                  <View 
+                  <View
                     style={[
-                      styles.riskScoreFill, 
-                      { 
+                      styles.riskScoreFill,
+                      {
                         width: `${user.riskScore}%`,
                         backgroundColor: user.riskScore > 70 ? '#22c55e' : user.riskScore > 40 ? '#eab308' : '#ef4444'
                       }
-                    ]} 
+                    ]}
                   />
                 </View>
               </View>
@@ -54,7 +55,7 @@ export default function ProfileScreen() {
 
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Account Information</Text>
-              
+
               <View style={styles.infoItem}>
                 <Ionicons name="call" size={20} color="#94a3b8" />
                 <View style={styles.infoText}>
@@ -94,9 +95,9 @@ export default function ProfileScreen() {
               ))}
             </View>
 
-            <View style={styles.section}>
+            <View style={[styles.section, lastSectionStyle]}>
               <Text style={styles.sectionTitle}>Actions</Text>
-              
+
               <TouchableOpacity style={styles.actionButton}>
                 <Ionicons name="settings" size={20} color="#fff" />
                 <Text style={styles.actionButtonText}>Settings</Text>

@@ -3,6 +3,7 @@ import { View, Text, ScrollView, StyleSheet, TouchableOpacity } from 'react-nati
 import { generateMockIncidentDetails } from '../../utils/mockData';
 import { format } from 'date-fns';
 import type { IncidentDetail } from '../../types';
+import { lastSectionStyle } from '@/constants/theme';
 
 export default function IncidentsScreen() {
   const [incidents, setIncidents] = useState<IncidentDetail[]>([]);
@@ -35,58 +36,61 @@ export default function IncidentsScreen() {
         </View>
 
         <ScrollView style={styles.content}>
-          <View style={styles.detailCard}>
-            <View style={[styles.severityBadge, { backgroundColor: getSeverityColor(selectedIncident.severity) }]}>
-              <Text style={styles.severityText}>{selectedIncident.severity.toUpperCase()}</Text>
-            </View>
-            
-            <Text style={styles.detailTitle}>{selectedIncident.title}</Text>
-            <Text style={styles.detailDate}>
-              {format(selectedIncident.date, 'MMM dd, yyyy - hh:mm a')}
-            </Text>
-            
-            <View style={styles.divider} />
-            
-            <Text style={styles.detailDescription}>{selectedIncident.description}</Text>
-            
-            <View style={styles.statsGrid}>
-              <View style={styles.statBox}>
-                <Text style={styles.statValue}>{selectedIncident.deathToll}</Text>
-                <Text style={styles.statLabel}>Deaths</Text>
+          <View style={lastSectionStyle}>
+            <View style={styles.detailCard}>
+              <View style={[styles.severityBadge, { backgroundColor: getSeverityColor(selectedIncident.severity) }]}>
+                <Text style={styles.severityText}>{selectedIncident.severity.toUpperCase()}</Text>
               </View>
-              <View style={styles.statBox}>
-                <Text style={styles.statValue}>{selectedIncident.injuryCount}</Text>
-                <Text style={styles.statLabel}>Injuries</Text>
+
+              <Text style={styles.detailTitle}>{selectedIncident.title}</Text>
+              <Text style={styles.detailDate}>
+                {format(selectedIncident.date, 'MMM dd, yyyy - hh:mm a')}
+              </Text>
+
+              <View style={styles.divider} />
+
+              <Text style={styles.detailDescription}>{selectedIncident.description}</Text>
+
+              <View style={styles.statsGrid}>
+                <View style={styles.statBox}>
+                  <Text style={styles.statValue}>{selectedIncident.deathToll}</Text>
+                  <Text style={styles.statLabel}>Deaths</Text>
+                </View>
+                <View style={styles.statBox}>
+                  <Text style={styles.statValue}>{selectedIncident.injuryCount}</Text>
+                  <Text style={styles.statLabel}>Injuries</Text>
+                </View>
+                <View style={styles.statBox}>
+                  <Text style={styles.statValue}>{selectedIncident.peopleHelped}</Text>
+                  <Text style={styles.statLabel}>Helpers</Text>
+                </View>
               </View>
-              <View style={styles.statBox}>
-                <Text style={styles.statValue}>{selectedIncident.peopleHelped}</Text>
-                <Text style={styles.statLabel}>Helpers</Text>
-              </View>
-            </View>
-            
-            <View style={styles.divider} />
-            
-            <View style={styles.infoSection}>
-              <Text style={styles.infoLabel}>Victim</Text>
-              <Text style={styles.infoValue}>{selectedIncident.victim}</Text>
-            </View>
-            
-            {selectedIncident.attackers !== 'N/A' && (
+
+              <View style={styles.divider} />
+
               <View style={styles.infoSection}>
-                <Text style={styles.infoLabel}>Attackers</Text>
-                <Text style={styles.infoValue}>{selectedIncident.attackers}</Text>
+                <Text style={styles.infoLabel}>Victim</Text>
+                <Text style={styles.infoValue}>{selectedIncident.victim}</Text>
               </View>
-            )}
-            
-            <View style={styles.divider} />
-            
-            <Text style={styles.storiesTitle}>📖 Incident Stories</Text>
-            {selectedIncident.stories.map((story, index) => (
-              <View key={index} style={styles.storyItem}>
-                <Text style={styles.storyBullet}>•</Text>
-                <Text style={styles.storyText}>{story}</Text>
-              </View>
-            ))}
+
+              {selectedIncident.attackers !== 'N/A' && (
+                <View style={styles.infoSection}>
+                  <Text style={styles.infoLabel}>Attackers</Text>
+                  <Text style={styles.infoValue}>{selectedIncident.attackers}</Text>
+                </View>
+              )}
+
+              <View style={styles.divider} />
+
+              <Text style={styles.storiesTitle}>📖 Incident Stories</Text>
+              {selectedIncident.stories.map((story, index) => (
+                <View key={index} style={styles.storyItem}>
+                  <Text style={styles.storyBullet}>•</Text>
+                  <Text style={styles.storyText}>{story}</Text>
+                </View>
+              ))}
+            </View>
+
           </View>
         </ScrollView>
       </View>
@@ -101,31 +105,34 @@ export default function IncidentsScreen() {
       </View>
 
       <ScrollView style={styles.content}>
-        {incidents.map((incident) => (
-          <TouchableOpacity
-            key={incident.id}
-            style={styles.incidentCard}
-            onPress={() => setSelectedIncident(incident)}
-          >
-            <View style={[styles.severityBadge, { backgroundColor: getSeverityColor(incident.severity) }]}>
-              <Text style={styles.severityText}>{incident.severity.toUpperCase()}</Text>
-            </View>
-            
-            <Text style={styles.incidentTitle}>{incident.title}</Text>
-            <Text style={styles.incidentDate}>
-              {format(incident.date, 'MMM dd, yyyy')}
-            </Text>
-            <Text style={styles.incidentDescription} numberOfLines={2}>
-              {incident.description}
-            </Text>
-            
-            <View style={styles.incidentStats}>
-              <Text style={styles.incidentStat}>💀 {incident.deathToll}</Text>
-              <Text style={styles.incidentStat}>🤕 {incident.injuryCount}</Text>
-              <Text style={styles.incidentStat}>👥 {incident.peopleHelped}</Text>
-            </View>
-          </TouchableOpacity>
-        ))}
+        <View style={lastSectionStyle}>
+          {incidents.map((incident) => (
+            <TouchableOpacity
+              key={incident.id}
+              style={styles.incidentCard}
+              onPress={() => setSelectedIncident(incident)}
+            >
+              <View style={[styles.severityBadge, { backgroundColor: getSeverityColor(incident.severity) }]}>
+                <Text style={styles.severityText}>{incident.severity.toUpperCase()}</Text>
+              </View>
+
+              <Text style={styles.incidentTitle}>{incident.title}</Text>
+              <Text style={styles.incidentDate}>
+                {format(incident.date, 'MMM dd, yyyy')}
+              </Text>
+              <Text style={styles.incidentDescription} numberOfLines={2}>
+                {incident.description}
+              </Text>
+
+              <View style={styles.incidentStats}>
+                <Text style={styles.incidentStat}>💀 {incident.deathToll}</Text>
+                <Text style={styles.incidentStat}>🤕 {incident.injuryCount}</Text>
+                <Text style={styles.incidentStat}>👥 {incident.peopleHelped}</Text>
+              </View>
+            </TouchableOpacity>
+          ))}
+
+        </View>
       </ScrollView>
     </View>
   );

@@ -6,19 +6,27 @@ import { View } from 'react-native';
 
 export default function TabLayout() {
   return (
-    <View style={{ flex: 1 }}>
+    <View style={{ flex: 1, backgroundColor: 'transparent' }}>
       <Tabs
         screenOptions={{
           tabBarActiveTintColor: '#ef4444',
           tabBarInactiveTintColor: '#94a3b8',
           tabBarStyle: {
-            backgroundColor: 'rgba(30, 41, 59, 0.95)',
-            borderTopColor: 'rgba(51, 65, 85, 0.5)',
+            backgroundColor: '#1E293BEF',
+            borderTopWidth: 1,
+            borderTopColor: '#334155',
+            
             paddingBottom: 8,
+            paddingHorizontal: 10,
+            paddingTop: 8,
             height: 70,
-            position: 'absolute',
             elevation: 0,
+            shadowOpacity: 0,
+            margin: 5,
+            borderRadius: 50,
+            position: 'absolute',
           },
+          tabBarBackground: () => null,
           headerStyle: {
             backgroundColor: '#1e293b',
           },

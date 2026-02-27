@@ -1,15 +1,18 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Dimensions } from 'react-native';
-import MapView, { Marker, Circle, PROVIDER_DEFAULT } from 'react-native-maps';
+import React, { useEffect, useRef, useState } from 'react';
+import { Animated, Dimensions, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import MapView, { Circle, Marker, PROVIDER_DEFAULT } from 'react-native-maps';
+import Toast from 'react-native-toast-message';
 import { useAppStore } from '../../store/useAppStore';
 import { getCurrentLocation, watchLocation } from '../../utils/location';
 import { generateMockDangerZones } from '../../utils/mockData';
-import Toast from 'react-native-toast-message';
+import { Ionicons } from '@expo/vector-icons';
 
 export default function DashboardScreen() {
   const { setCurrentLocation, setDangerZones, dangerZones } = useAppStore();
   const [locationPermissionGranted, setLocationPermissionGranted] = useState(false);
   const [isRequestingLocation, setIsRequestingLocation] = useState(false);
+  const [menuVisible, setMenuVisible] = useState(false);
+  const slideAnim = useRef(new Animated.Value(-180)).current;
   const [mapRegion, setMapRegion] = useState({
     latitude: 23.7808,
     longitude: 90.4132,
@@ -68,6 +71,24 @@ export default function DashboardScreen() {
     requestLocationPermission();
   }, []);
 
+  const toggleMenu = () => {
+    const toValue = menuVisible ? -500 : 0;
+    setMenuVisible(!menuVisible);
+    Animated.spring(slideAnim, {
+      toValue,
+      useNativeDriver: true,
+      tension: 70,
+      friction: 12,
+    }).start();
+  };
+
+  const LEGEND = [
+    { label: 'Critical', color: '#dc2626' },
+    { label: 'High', color: '#f97316' },
+    { label: 'Medium', color: '#eab308' },
+    { label: 'Low', color: '#3b82f6' },
+  ];
+
   const getSeverityColor = (severity: string) => {
     switch (severity) {
       case 'critical':
@@ -87,7 +108,7 @@ export default function DashboardScreen() {
     return (
       <View style={styles.permissionContainer}>
         <View style={styles.permissionCard}>
-          <Text style={styles.permissionIcon}>📍</Text>
+          <Text style={styles.permissionIcon}><Ionicons name='location' color={'white'} size={40} /></Text>
           <Text style={styles.permissionTitle}>Location Access Required</Text>
           <Text style={styles.permissionText}>
             Safetify needs your location to provide safety alerts and show nearby danger zones.
@@ -142,14 +163,18 @@ export default function DashboardScreen() {
         <View style={styles.header}>
           <View>
             <Text style={styles.headerTitle}>🛡️ Safetify</Text>
-            <Text style={styles.headerSubtitle}>Stay Safe, Stay Connected</Text>
           </View>
+          <TouchableOpacity style={styles.menuButton} onPress={toggleMenu} activeOpacity={0.7}>
+            <Ionicons name="menu" size={24} color="#fff" />
+          </TouchableOpacity>
         </View>
+      </View>
 
-        <ScrollView 
-          horizontal 
+      <Animated.View style={[styles.dangerZonesPanel, { transform: [{ translateY: slideAnim }] }]}>
+        <ScrollView
+          horizontal
           showsHorizontalScrollIndicator={false}
-          style={styles.dangerZonesList}
+          contentContainerStyle={styles.dangerZonesList}
         >
           {dangerZones.map((zone) => (
             <View key={zone.id} style={styles.dangerZoneCard}>
@@ -161,6 +186,16 @@ export default function DashboardScreen() {
             </View>
           ))}
         </ScrollView>
+      </Animated.View>
+
+      {/* Severity legend chips over the map */}
+      <View style={styles.legendContainer}>
+        {LEGEND.map((item) => (
+          <View key={item.label} style={[styles.legendChip, { backgroundColor: item.color }]}>
+            <View style={styles.legendDot} />
+            <Text style={styles.legendText}>{item.label}</Text>
+          </View>
+        ))}
       </View>
     </View>
   );
@@ -223,26 +258,83 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    backgroundColor: 'rgba(15, 23, 42, 0.95)',
+    backgroundColor: 'rgba(15, 23, 42, 0.97)',
     paddingTop: 50,
     paddingBottom: 16,
+    zIndex: 10,
   },
   header: {
-    paddingHorizontal: 20,
-    marginBottom: 16,
+    paddingHorizontal: 10,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   headerTitle: {
-    fontSize: 24,
+    fontSize: 25,
     fontWeight: 'bold',
     color: '#fff',
   },
   headerSubtitle: {
-    fontSize: 14,
+    fontSize: 8,
     color: '#94a3b8',
-    marginTop: 4,
+    marginTop: 0,
+    paddingLeft: 5,
+  },
+  dangerZonesPanel: {
+    position: 'absolute',
+    top: 120,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(15, 23, 42, 0.97)',
+    paddingBottom: 14,
+    zIndex: 9,
   },
   dangerZonesList: {
     paddingHorizontal: 20,
+    paddingTop: 12,
+  },
+  menuButton: {
+    padding: 8,
+    gap: 5,
+    justifyContent: 'center',
+  },
+  menuLine: {
+    width: 24,
+    height: 2.5,
+    backgroundColor: '#fff',
+    borderRadius: 2,
+    marginVertical: 2,
+  },
+  legendContainer: {
+    position: 'absolute',
+    bottom: 120,
+    right: 16,
+    gap: 6,
+  },
+  legendChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    elevation: 4,
+    gap: 5,
+  },
+  legendDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: 'rgba(255,255,255,0.7)',
+  },
+  legendText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.3,
   },
   dangerZoneCard: {
     backgroundColor: '#1e293b',
