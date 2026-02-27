@@ -4,7 +4,6 @@ import MapView, { Marker, Circle, PROVIDER_DEFAULT } from 'react-native-maps';
 import { useAppStore } from '../../store/useAppStore';
 import { getCurrentLocation, watchLocation } from '../../utils/location';
 import { generateMockDangerZones } from '../../utils/mockData';
-import SOSButton from '../../components/SOSButton';
 import Toast from 'react-native-toast-message';
 
 export default function DashboardScreen() {
@@ -163,8 +162,6 @@ export default function DashboardScreen() {
           ))}
         </ScrollView>
       </View>
-
-      <SOSButton />
     </View>
   );
 }

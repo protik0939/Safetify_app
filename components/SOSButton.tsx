@@ -9,9 +9,12 @@ export default function SOSButton() {
   const [holdProgress, setHoldProgress] = useState(0);
   const [isHolding, setIsHolding] = useState(false);
   const [sosCreatedAt, setSosCreatedAt] = useState<Date | null>(null);
-  const holdTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const [elapsedTime, setElapsedTime] = useState(0);
+  const holdTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const progressRef = useRef(0);
   const scaleAnim = useRef(new Animated.Value(1)).current;
+  const progressWidthAnim = useRef(new Animated.Value(0)).current;
 
   const startHold = () => {
     if (!userLocation && !isSOSActive) {
@@ -25,6 +28,7 @@ export default function SOSButton() {
     
     setIsHolding(true);
     progressRef.current = 0;
+    progressWidthAnim.setValue(0);
 
     // Pulse animation
     Animated.loop(
@@ -41,6 +45,13 @@ export default function SOSButton() {
         }),
       ])
     ).start();
+
+    // Smooth progress bar animation
+    Animated.timing(progressWidthAnim, {
+      toValue: 100,
+      duration: 5000,
+      useNativeDriver: false,
+    }).start();
 
     holdTimerRef.current = setInterval(() => {
       progressRef.current += 2;
@@ -65,6 +76,8 @@ export default function SOSButton() {
     setHoldProgress(0);
     progressRef.current = 0;
     scaleAnim.setValue(1);
+    progressWidthAnim.stopAnimation();
+    progressWidthAnim.setValue(0);
   };
 
   const triggerSOS = () => {
@@ -72,7 +85,9 @@ export default function SOSButton() {
       const sosRequest = generateMockSOSRequest();
       setActiveSOSRequest(sosRequest);
       setSOSActive(true);
-      setSosCreatedAt(new Date());
+      const now = new Date();
+      setSosCreatedAt(now);
+      setElapsedTime(0);
       Toast.show({
         type: 'success',
         text1: 'SOS Activated',
@@ -85,6 +100,10 @@ export default function SOSButton() {
     setActiveSOSRequest(null);
     setSOSActive(false);
     setSosCreatedAt(null);
+    setElapsedTime(0);
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+    }
     Toast.show({
       type: 'success',
       text1: 'SOS Cancelled',
@@ -92,124 +111,219 @@ export default function SOSButton() {
     });
   };
 
+  // Timer effect for auto-incrementing elapsed time
+  useEffect(() => {
+    if (isSOSActive && sosCreatedAt) {
+      timerRef.current = setInterval(() => {
+        const elapsed = Math.floor((Date.now() - sosCreatedAt.getTime()) / 1000);
+        setElapsedTime(elapsed);
+      }, 1000);
+    } else if (timerRef.current) {
+      clearInterval(timerRef.current);
+    }
+
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+      }
+    };
+  }, [isSOSActive, sosCreatedAt]);
+
   useEffect(() => {
     return () => {
       if (holdTimerRef.current) {
         clearInterval(holdTimerRef.current);
       }
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+      }
     };
   }, []);
 
+  const remainingSeconds = Math.ceil((100 - holdProgress) / 20);
+  const secondsText = remainingSeconds === 1 ? 'second' : 'seconds';
+  const actionText = isSOSActive ? 'cancel SOS' : 'activate SOS';
+  const holdMessage = `Hold for ${remainingSeconds} ${secondsText} to ${actionText}`;
+
+  const formatElapsed = (seconds: number) => {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m}:${String(s).padStart(2, '0')}`;
+  };
+
   if (isSOSActive && activeSOSRequest) {
-    const timeElapsed = sosCreatedAt ? Math.floor((Date.now() - sosCreatedAt.getTime()) / 1000) : 0;
     const respondentCount = activeSOSRequest.respondents.length;
 
     return (
-      <View style={styles.sosActiveContainer}>
-        <View style={styles.sosActiveCard}>
-          <Text style={styles.sosActiveTitle}>🚨 SOS MODE ACTIVATED</Text>
-          <View style={styles.timerContainer}>
-            <Text style={styles.timerText}>{timeElapsed}s</Text>
-          </View>
-          <View style={styles.statsContainer}>
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>{respondentCount}</Text>
-              <Text style={styles.statLabel}>Responders</Text>
+      <>
+        {isHolding && (
+          <View style={styles.loadingBarContainer}>
+            <View style={styles.loadingBarContent}>
+              <Text style={styles.loadingBarText}>{holdMessage}</Text>
+              <View style={styles.loadingBarTrack}>
+                <Animated.View 
+                  style={[
+                    styles.loadingBarFill,
+                    {
+                      width: progressWidthAnim.interpolate({
+                        inputRange: [0, 100],
+                        outputRange: ['0%', '100%'],
+                      }),
+                    },
+                  ]} 
+                />
+              </View>
             </View>
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>2</Text>
-              <Text style={styles.statLabel}>On Way</Text>
-            </View>
           </View>
+        )}
+        <View style={styles.sosActiveContainer}>
+          <View style={styles.sosActiveCard}>
+            <Text style={styles.sosActiveTitle}>🚨 SOS MODE ACTIVATED</Text>
+            <View style={styles.statsContainer}>
+              <View style={styles.statItem}>
+                <Text style={styles.statValue}>{respondentCount}</Text>
+                <Text style={styles.statLabel}>Responders</Text>
+              </View>
+              <View style={styles.statItem}>
+                <Text style={styles.statValue}>2</Text>
+                <Text style={styles.statLabel}>On Way</Text>
+              </View>
+            </View>
+            <TouchableOpacity
+              style={styles.cancelButton}
+              onPressIn={startHold}
+              onPressOut={stopHold}
+            >
+              <Text style={styles.cancelButtonText}>
+                Hold to Cancel SOS
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+        <View style={styles.container}>
           <TouchableOpacity
-            style={styles.cancelButton}
-            onPressIn={startHold}
-            onPressOut={stopHold}
+            style={[styles.sosButton, styles.sosButtonDisabled]}
+            disabled={true}
           >
-            <Text style={styles.cancelButtonText}>
-              {isHolding ? `Hold to Cancel (${holdProgress}%)` : 'Hold to Cancel SOS'}
-            </Text>
+            <Text style={styles.sosTimerText}>{formatElapsed(elapsedTime)}</Text>
           </TouchableOpacity>
         </View>
-      </View>
+      </>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
-        <TouchableOpacity
-          style={[styles.sosButton, isHolding && styles.sosButtonActive]}
-          onPressIn={startHold}
-          onPressOut={stopHold}
-        >
-          <Text style={styles.sosText}>SOS</Text>
-          {isHolding && (
-            <View style={styles.progressContainer}>
-              <View style={[styles.progressBar, { width: `${holdProgress}%` }]} />
+    <>
+      {isHolding && (
+        <View style={styles.loadingBarContainer}>
+          <View style={styles.loadingBarContent}>
+            <Text style={styles.loadingBarText}>{holdMessage}</Text>
+            <View style={styles.loadingBarTrack}>
+              <Animated.View 
+                style={[
+                  styles.loadingBarFill,
+                  {
+                    width: progressWidthAnim.interpolate({
+                      inputRange: [0, 100],
+                      outputRange: ['0%', '100%'],
+                    }),
+                  },
+                ]} 
+              />
             </View>
-          )}
-        </TouchableOpacity>
-      </Animated.View>
-      <Text style={styles.instructionText}>Hold for 5 seconds</Text>
-    </View>
+          </View>
+        </View>
+      )}
+      <View style={styles.container}>
+        <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
+          <TouchableOpacity
+            style={[styles.sosButton, isHolding && styles.sosButtonActive]}
+            onPressIn={startHold}
+            onPressOut={stopHold}
+          >
+            <Text style={styles.sosText}>SOS</Text>
+          </TouchableOpacity>
+        </Animated.View>
+        <Text style={styles.instructionText}>Hold for 5 seconds</Text>
+      </View>
+    </>
   );
 }
 
 const styles = StyleSheet.create({
+  loadingBarContainer: {
+    position: 'absolute',
+    top: 60,
+    left: 20,
+    right: 20,
+    zIndex: 1000,
+  },
+  loadingBarContent: {
+    backgroundColor: 'rgba(0, 0, 0, 0.85)',
+    borderRadius: 12,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  loadingBarText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  loadingBarTrack: {
+    height: 6,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  loadingBarFill: {
+    height: '100%',
+    backgroundColor: '#ef4444',
+    borderRadius: 3,
+  },
   container: {
     position: 'absolute',
-    bottom: 100,
+    bottom: 25,
     alignSelf: 'center',
     alignItems: 'center',
+    zIndex: 100,
   },
   sosButton: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
+    width: 80,
+    height: 80,
+    borderRadius: 45,
     backgroundColor: '#ef4444',
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
+    shadowOpacity: 0.5,
+    shadowRadius: 12,
+    elevation: 10,
+    borderWidth: 1,
+    borderColor: '#fff',
   },
   sosButtonActive: {
     backgroundColor: '#dc2626',
   },
   sosText: {
-    fontSize: 28,
+    fontSize: 22,
     fontWeight: 'bold',
     color: '#fff',
-  },
-  progressContainer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 4,
-    backgroundColor: 'rgba(255,255,255,0.3)',
-    borderBottomLeftRadius: 50,
-    borderBottomRightRadius: 50,
-    overflow: 'hidden',
-  },
-  progressBar: {
-    height: '100%',
-    backgroundColor: '#fff',
+    letterSpacing: 1,
+    fontFamily: '',
   },
   instructionText: {
-    marginTop: 8,
-    fontSize: 12,
-    color: '#fff',
-    textShadowColor: 'rgba(0, 0, 0, 0.75)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
+    display: 'none',
   },
   sosActiveContainer: {
     position: 'absolute',
-    bottom: 80,
+    bottom: 130,
     left: 20,
     right: 20,
   },
@@ -230,17 +344,15 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 16,
   },
-  timerContainer: {
-    backgroundColor: '#b91c1c',
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 16,
+  sosButtonDisabled: {
+    backgroundColor: '#7f1d1d',
+    opacity: 0.9,
   },
-  timerText: {
-    fontSize: 32,
+  sosTimerText: {
+    fontSize: 16,
     fontWeight: 'bold',
     color: '#fff',
-    textAlign: 'center',
+    letterSpacing: 1,
   },
   statsContainer: {
     flexDirection: 'row',
