@@ -1,18 +1,19 @@
+import { Ionicons } from '@expo/vector-icons';
 import React, { useEffect, useRef, useState } from 'react';
-import { Animated, Dimensions, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Animated, Dimensions, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import MapView, { Circle, Marker, PROVIDER_DEFAULT } from 'react-native-maps';
 import Toast from 'react-native-toast-message';
+import SafetifyLogo from '../../assets/images/safetifyLogo.svg';
 import { useAppStore } from '../../store/useAppStore';
 import { getCurrentLocation, watchLocation } from '../../utils/location';
 import { generateMockDangerZones } from '../../utils/mockData';
-import { Ionicons } from '@expo/vector-icons';
 
 export default function DashboardScreen() {
   const { setCurrentLocation, setDangerZones, dangerZones } = useAppStore();
   const [locationPermissionGranted, setLocationPermissionGranted] = useState(false);
   const [isRequestingLocation, setIsRequestingLocation] = useState(false);
   const [menuVisible, setMenuVisible] = useState(false);
-  const slideAnim = useRef(new Animated.Value(-180)).current;
+  const slideAnim = useRef(new Animated.Value(-500)).current;
   const [mapRegion, setMapRegion] = useState({
     latitude: 23.7808,
     longitude: 90.4132,
@@ -23,7 +24,7 @@ export default function DashboardScreen() {
   const requestLocationPermission = async () => {
     setIsRequestingLocation(true);
     const location = await getCurrentLocation();
-    
+
     if (location) {
       setLocationPermissionGranted(true);
       setCurrentLocation({
@@ -118,9 +119,14 @@ export default function DashboardScreen() {
             onPress={requestLocationPermission}
             disabled={isRequestingLocation}
           >
-            <Text style={styles.permissionButtonText}>
-              {isRequestingLocation ? 'Requesting...' : 'Grant Location Access'}
-            </Text>
+            {isRequestingLocation ? (
+              <View style={styles.permissionButtonLoading}>
+                <ActivityIndicator size="small" color="#fff" />
+                <Text style={styles.permissionButtonText}>Checking Location Access</Text>
+              </View>
+            ) : (
+              <Text style={styles.permissionButtonText}>Grant Location Access</Text>
+            )}
           </TouchableOpacity>
         </View>
       </View>
@@ -161,11 +167,13 @@ export default function DashboardScreen() {
 
       <View style={styles.topPanel}>
         <View style={styles.header}>
-          <View>
-            <Text style={styles.headerTitle}>🛡️ Safetify</Text>
+          <View style={styles.headerBrand}>
+            <SafetifyLogo width={28} height={28} />
+            <Text style={styles.headerTitle}>Safetify</Text>
           </View>
           <TouchableOpacity style={styles.menuButton} onPress={toggleMenu} activeOpacity={0.7}>
-            <Ionicons name="menu" size={24} color="#fff" />
+            {
+              menuVisible ? <Ionicons name="chevron-up" size={24} color="#fff" /> : <Ionicons name="menu" size={24} color="#fff" />}
           </TouchableOpacity>
         </View>
       </View>
@@ -248,6 +256,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 32,
     paddingVertical: 16,
   },
+  permissionButtonLoading: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
   permissionButtonText: {
     color: '#fff',
     fontSize: 16,
@@ -269,6 +282,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
+  headerBrand: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
   headerTitle: {
     fontSize: 25,
     fontWeight: 'bold',
@@ -282,15 +300,17 @@ const styles = StyleSheet.create({
   },
   dangerZonesPanel: {
     position: 'absolute',
-    top: 120,
+    top: 110,
     left: 0,
     right: 0,
     backgroundColor: 'rgba(15, 23, 42, 0.97)',
-    paddingBottom: 14,
+    paddingBottom: 12,
     zIndex: 9,
+    margin: 10,
+    borderRadius: 15,
   },
   dangerZonesList: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 12,
     paddingTop: 12,
   },
   menuButton: {

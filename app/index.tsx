@@ -1,6 +1,7 @@
-import { useEffect } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useEffect } from 'react';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import SafetifyLogo from '../assets/images/safetifyLogo.svg';
 import { useAppStore } from '../store/useAppStore';
 
 export default function IndexScreen() {
@@ -22,9 +23,7 @@ export default function IndexScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.logoContainer}>
-        <View style={styles.logo}>
-          <Text style={styles.logoText}>S</Text>
-        </View>
+        <SafetifyLogo width={80} height={80} style={styles.logoImage} />
         <Text style={styles.title}>Safetify</Text>
         <Text style={styles.subtitle}>Community Safety Platform</Text>
       </View>
@@ -43,19 +42,8 @@ const styles = StyleSheet.create({
   logoContainer: {
     alignItems: 'center',
   },
-  logo: {
-    width: 80,
-    height: 80,
-    borderRadius: 20,
-    backgroundColor: '#ef4444',
-    justifyContent: 'center',
-    alignItems: 'center',
+  logoImage: {
     marginBottom: 20,
-  },
-  logoText: {
-    fontSize: 40,
-    fontWeight: 'bold',
-    color: '#fff',
   },
   title: {
     fontSize: 36,
