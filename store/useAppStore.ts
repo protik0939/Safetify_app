@@ -1,11 +1,18 @@
-import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { User, Location, SOSRequest, DangerZone, PushNotification } from '../types';
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { create } from "zustand";
+import { createJSONStorage, persist } from "zustand/middleware";
+import {
+    DangerZone,
+    Location,
+    PushNotification,
+    SOSRequest,
+    User,
+} from "../types";
 
 interface AppState {
   user: User | null;
   isAuthenticated: boolean;
+  sessionToken: string | null;
   currentLocation: Location | null;
   userLocation: Location | null;
   dangerZones: DangerZone[];
@@ -14,9 +21,10 @@ interface AppState {
   notifications: PushNotification[];
   isSOSActive: boolean;
   sosHoldProgress: number;
-  
+
   // Actions
   setUser: (user: User | null) => void;
+  setSessionToken: (token: string | null) => void;
   setCurrentLocation: (location: Location) => void;
   setDangerZones: (zones: DangerZone[]) => void;
   setActiveSOSRequest: (sos: SOSRequest | null) => void;
@@ -34,6 +42,7 @@ export const useAppStore = create<AppState>()(
     (set) => ({
       user: null,
       isAuthenticated: false,
+      sessionToken: null,
       currentLocation: null,
       userLocation: null,
       dangerZones: [],
@@ -44,7 +53,9 @@ export const useAppStore = create<AppState>()(
       sosHoldProgress: 0,
 
       setUser: (user) => set({ user, isAuthenticated: !!user }),
-      setCurrentLocation: (currentLocation) => set({ currentLocation, userLocation: currentLocation }),
+      setSessionToken: (sessionToken) => set({ sessionToken }),
+      setCurrentLocation: (currentLocation) =>
+        set({ currentLocation, userLocation: currentLocation }),
       setDangerZones: (dangerZones) => set({ dangerZones }),
       setActiveSOSRequest: (activeSOSRequest) => set({ activeSOSRequest }),
       addNotification: (notification) =>
@@ -66,14 +77,15 @@ export const useAppStore = create<AppState>()(
         set({
           user: null,
           isAuthenticated: false,
+          sessionToken: null,
           currentLocation: null,
           userLocation: null,
           activeSOSRequest: null,
         }),
     }),
     {
-      name: 'safetify-store',
+      name: "safetify-store",
       storage: createJSONStorage(() => AsyncStorage),
-    }
-  )
+    },
+  ),
 );

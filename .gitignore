@@ -41,3 +41,8 @@ app-example
 # generated native folders
 /ios
 /android
+
+# Firebase / Google secrets
+safetify-app-firebase-adminsdk-fbsvc-47cc0ac72e.json
+google-services.json
+app.json

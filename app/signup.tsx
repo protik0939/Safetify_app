@@ -3,11 +3,11 @@ import React, { useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import Toast from 'react-native-toast-message';
 import { useAppStore } from '../store/useAppStore';
-import { mockUser } from '../utils/mockData';
+import { registerUser } from '../utils/authApi';
 
 export default function SignupScreen() {
   const router = useRouter();
-  const { setUser } = useAppStore();
+  const { setUser, setSessionToken } = useAppStore();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
@@ -16,11 +16,11 @@ export default function SignupScreen() {
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSignup = async () => {
-    if (!name || !email || !phone || !password || !confirmPassword) {
+    if (!name || !email || !password || !confirmPassword) {
       Toast.show({
         type: 'error',
         text1: 'Error',
-        text2: 'Please fill all fields',
+        text2: 'Please fill all required fields',
       });
       return;
     }
@@ -35,19 +35,35 @@ export default function SignupScreen() {
     }
 
     setIsLoading(true);
-
-    // Simulate API call
-    setTimeout(() => {
-      const user = { ...mockUser, name, email, phone };
-      setUser(user);
+    try {
+      const { user: apiUser, token } = await registerUser({ name, email, password });
+      setSessionToken(token ?? null);
+      setUser({
+        id: apiUser.id,
+        name: apiUser.name,
+        email: apiUser.email,
+        phone: phone ?? '',
+        location: { latitude: 0, longitude: 0, timestamp: new Date() },
+        createdAt: new Date(apiUser.createdAt),
+        emergencyContacts: [],
+        riskScore: 0,
+        avatar: apiUser.image ?? undefined,
+      });
       Toast.show({
         type: 'success',
         text1: 'Success',
         text2: 'Account created successfully!',
       });
-      setIsLoading(false);
       router.replace('/(tabs)');
-    }, 1000);
+    } catch (err: any) {
+      Toast.show({
+        type: 'error',
+        text1: 'Registration failed',
+        text2: err?.message ?? 'Something went wrong',
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (

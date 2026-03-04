@@ -3,11 +3,11 @@ import React, { useState } from 'react';
 import { KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import Toast from 'react-native-toast-message';
 import { useAppStore } from '../store/useAppStore';
-import { mockUser } from '../utils/mockData';
+import { loginUser } from '../utils/authApi';
 
 export default function LoginScreen() {
   const router = useRouter();
-  const { setUser } = useAppStore();
+  const { setUser, setSessionToken } = useAppStore();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -23,19 +23,35 @@ export default function LoginScreen() {
     }
 
     setIsLoading(true);
-
-    // Simulate API call
-    setTimeout(() => {
-      const user = { ...mockUser, email };
-      setUser(user);
+    try {
+      const { user: apiUser, token } = await loginUser({ email, password });
+      setSessionToken(token ?? null);
+      setUser({
+        id: apiUser.id,
+        name: apiUser.name,
+        email: apiUser.email,
+        phone: '',
+        location: { latitude: 0, longitude: 0, timestamp: new Date() },
+        createdAt: new Date(apiUser.createdAt),
+        emergencyContacts: [],
+        riskScore: 0,
+        avatar: apiUser.image ?? undefined,
+      });
       Toast.show({
         type: 'success',
         text1: 'Success',
         text2: 'Login successful!',
       });
-      setIsLoading(false);
       router.replace('/(tabs)');
-    }, 1000);
+    } catch (err: any) {
+      Toast.show({
+        type: 'error',
+        text1: 'Login failed',
+        text2: err?.message ?? 'Something went wrong',
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
