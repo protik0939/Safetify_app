@@ -1,12 +1,106 @@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Animated, Dimensions, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import MapView, { Circle, Marker, PROVIDER_DEFAULT } from 'react-native-maps';
+import { ActivityIndicator, Animated, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Toast from 'react-native-toast-message';
+import { WebView } from 'react-native-webview';
 import SafetifyLogo from '../../assets/images/safetifyLogo.svg';
 import { useAppStore } from '../../store/useAppStore';
 import { getCurrentLocation, watchLocation } from '../../utils/location';
 import { generateMockDangerZones } from '../../utils/mockData';
+
+const getSeverityColor = (severity: string) => {
+  switch (severity) {
+    case 'critical': return '#dc2626';
+    case 'high':     return '#f97316';
+    case 'medium':   return '#eab308';
+    case 'low':      return '#3b82f6';
+    default:         return '#6b7280';
+  }
+};
+
+const buildLeafletHTML = (
+  lat: number,
+  lng: number,
+  zones: ReturnType<typeof generateMockDangerZones>
+) => {
+  const zonesJSON = JSON.stringify(
+    zones.map((z) => ({
+      lat: z.center.latitude,
+      lng: z.center.longitude,
+      radius: z.radius * 1000,
+      severity: z.severity,
+      color: getSeverityColor(z.severity),
+    }))
+  );
+
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body, html { width: 100%; height: 100%; background: #0f172a; }
+    #map { width: 100%; height: 100%; }
+    .leaflet-control-attribution { font-size: 9px; }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <script>
+    var map = L.map('map', { zoomControl: true }).setView([${lat}, ${lng}], 14);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '\u00a9 <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+      maxZoom: 19,
+    }).addTo(map);
+
+    // User location marker
+    var userIcon = L.divIcon({
+      html: '<div style="width:14px;height:14px;border-radius:50%;background:#3b82f6;border:3px solid #fff;box-shadow:0 0 0 4px rgba(59,130,246,0.35);"></div>',
+      iconSize: [14, 14],
+      iconAnchor: [7, 7],
+      className: '',
+    });
+    var userMarker = L.marker([${lat}, ${lng}], { icon: userIcon, zIndexOffset: 1000 }).addTo(map);
+
+    // Danger zones
+    var zones = ${zonesJSON};
+    zones.forEach(function(z) {
+      L.circle([z.lat, z.lng], {
+        radius: z.radius,
+        color: z.color,
+        fillColor: z.color,
+        fillOpacity: 0.20,
+        weight: 2,
+      }).addTo(map);
+
+      var pinIcon = L.divIcon({
+        html: '<div style="width:12px;height:12px;border-radius:50%;background:' + z.color + ';border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,0.5);"></div>',
+        iconSize: [12, 12],
+        iconAnchor: [6, 6],
+        className: '',
+      });
+      L.marker([z.lat, z.lng], { icon: pinIcon }).addTo(map);
+    });
+
+    // Receive location updates from React Native
+    document.addEventListener('message', handleMsg);
+    window.addEventListener('message', handleMsg);
+    function handleMsg(e) {
+      try {
+        var d = JSON.parse(e.data);
+        if (d.type === 'updateLocation') {
+          userMarker.setLatLng([d.lat, d.lng]);
+          map.panTo([d.lat, d.lng]);
+        }
+      } catch(_) {}
+    }
+  </script>
+</body>
+</html>`;
+};
 
 export default function DashboardScreen() {
   const { setCurrentLocation, setDangerZones, dangerZones } = useAppStore();
@@ -14,12 +108,8 @@ export default function DashboardScreen() {
   const [isRequestingLocation, setIsRequestingLocation] = useState(false);
   const [menuVisible, setMenuVisible] = useState(false);
   const slideAnim = useRef(new Animated.Value(-500)).current;
-  const [mapRegion, setMapRegion] = useState({
-    latitude: 23.7808,
-    longitude: 90.4132,
-    latitudeDelta: 0.05,
-    longitudeDelta: 0.05,
-  });
+  const webViewRef = useRef<WebView>(null);
+  const [mapCenter, setMapCenter] = useState({ latitude: 23.7808, longitude: 90.4132 });
 
   const requestLocationPermission = async () => {
     setIsRequestingLocation(true);
@@ -34,11 +124,9 @@ export default function DashboardScreen() {
         accuracy: location.coords.accuracy || undefined,
       });
 
-      setMapRegion({
+      setMapCenter({
         latitude: location.coords.latitude,
         longitude: location.coords.longitude,
-        latitudeDelta: 0.05,
-        longitudeDelta: 0.05,
       });
 
       Toast.show({
@@ -50,12 +138,19 @@ export default function DashboardScreen() {
       setDangerZones(generateMockDangerZones());
 
       watchLocation((newLocation) => {
+        const lat = newLocation.coords.latitude;
+        const lng = newLocation.coords.longitude;
         setCurrentLocation({
-          latitude: newLocation.coords.latitude,
-          longitude: newLocation.coords.longitude,
+          latitude: lat,
+          longitude: lng,
           timestamp: new Date(),
           accuracy: newLocation.coords.accuracy || undefined,
         });
+        setMapCenter({ latitude: lat, longitude: lng });
+        // Push live location update into the WebView map
+        webViewRef.current?.injectJavaScript(
+          `handleMsg({ data: JSON.stringify({ type: 'updateLocation', lat: ${lat}, lng: ${lng} }) }); true;`
+        );
       });
     } else {
       setLocationPermissionGranted(false);
@@ -71,6 +166,8 @@ export default function DashboardScreen() {
   useEffect(() => {
     requestLocationPermission();
   }, []);
+
+  const leafletHTML = buildLeafletHTML(mapCenter.latitude, mapCenter.longitude, dangerZones);
 
   const toggleMenu = () => {
     const toValue = menuVisible ? -500 : 0;
@@ -89,21 +186,6 @@ export default function DashboardScreen() {
     { label: 'Medium', color: '#eab308' },
     { label: 'Low', color: '#3b82f6' },
   ];
-
-  const getSeverityColor = (severity: string) => {
-    switch (severity) {
-      case 'critical':
-        return '#dc2626';
-      case 'high':
-        return '#f97316';
-      case 'medium':
-        return '#eab308';
-      case 'low':
-        return '#3b82f6';
-      default:
-        return '#6b7280';
-    }
-  };
 
   if (!locationPermissionGranted) {
     return (
@@ -135,35 +217,16 @@ export default function DashboardScreen() {
 
   return (
     <View style={styles.container}>
-      <MapView
+      <WebView
+        ref={webViewRef}
         style={styles.map}
-        provider={PROVIDER_DEFAULT}
-        region={mapRegion}
-        showsUserLocation
-        showsMyLocationButton
-      >
-        {dangerZones.map((zone) => (
-          <React.Fragment key={zone.id}>
-            <Circle
-              center={{
-                latitude: zone.center.latitude,
-                longitude: zone.center.longitude,
-              }}
-              radius={zone.radius * 1000}
-              fillColor={`${getSeverityColor(zone.severity)}40`}
-              strokeColor={getSeverityColor(zone.severity)}
-              strokeWidth={2}
-            />
-            <Marker
-              coordinate={{
-                latitude: zone.center.latitude,
-                longitude: zone.center.longitude,
-              }}
-              pinColor={getSeverityColor(zone.severity)}
-            />
-          </React.Fragment>
-        ))}
-      </MapView>
+        source={{ html: leafletHTML }}
+        originWhitelist={['*']}
+        javaScriptEnabled
+        domStorageEnabled
+        mixedContentMode="always"
+        allowUniversalAccessFromFileURLs
+      />
 
       <View style={styles.topPanel}>
         <View style={styles.header}>
@@ -215,8 +278,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#0f172a',
   },
   map: {
-    width: Dimensions.get('window').width,
-    height: Dimensions.get('window').height,
+    flex: 1,
   },
   permissionContainer: {
     flex: 1,

@@ -2,6 +2,7 @@ import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import Toast from 'react-native-toast-message';
+import SafetifyLogo from '../assets/images/safetifyLogo.svg';
 import { useAppStore } from '../store/useAppStore';
 import { loginUser } from '../utils/authApi';
 
@@ -61,9 +62,7 @@ export default function LoginScreen() {
     >
       <View style={styles.content}>
         <View style={styles.logoContainer}>
-          <View style={styles.logo}>
-            <Text style={styles.logoText}>S</Text>
-          </View>
+          <SafetifyLogo width={80} height={80} style={styles.logoImage} />
           <Text style={styles.title}>Safetify</Text>
           <Text style={styles.subtitle}>Community Safety Platform</Text>
         </View>
@@ -138,19 +137,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 48,
   },
-  logo: {
-    width: 64,
-    height: 64,
-    borderRadius: 16,
-    backgroundColor: '#ef4444',
-    justifyContent: 'center',
-    alignItems: 'center',
+  logoImage: {
     marginBottom: 16,
-  },
-  logoText: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#fff',
   },
   title: {
     fontSize: 32,

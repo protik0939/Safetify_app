@@ -2,6 +2,7 @@ import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import Toast from 'react-native-toast-message';
+import SafetifyLogo from '../assets/images/safetifyLogo.svg';
 import { useAppStore } from '../store/useAppStore';
 import { registerUser } from '../utils/authApi';
 
@@ -74,9 +75,7 @@ export default function SignupScreen() {
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.content}>
           <View style={styles.logoContainer}>
-            <View style={styles.logo}>
-              <Text style={styles.logoText}>S</Text>
-            </View>
+            <SafetifyLogo width={80} height={80} style={styles.logoImage} />
             <Text style={styles.title}>Create Account</Text>
             <Text style={styles.subtitle}>Join the Safetify community</Text>
           </View>
@@ -185,19 +184,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 40,
   },
-  logo: {
-    width: 64,
-    height: 64,
-    borderRadius: 16,
-    backgroundColor: '#ef4444',
-    justifyContent: 'center',
-    alignItems: 'center',
+  logoImage: {
     marginBottom: 16,
-  },
-  logoText: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#fff',
   },
   title: {
     fontSize: 32,

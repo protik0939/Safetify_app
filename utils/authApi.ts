@@ -75,10 +75,7 @@ export interface AuthResponse {
 async function handleResponse<T>(res: Response): Promise<T> {
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    const message =
-      (data as any)?.message ||
-      (data as any)?.error ||
-      `Request failed (${res.status})`;
+    const message = `Request failed (${res.status})`;
     throw new Error(message);
   }
   return data as T;
@@ -132,15 +129,12 @@ export async function loginUser(payload: LoginPayload): Promise<AuthResponse> {
   console.log("[loginUser] raw response:", JSON.stringify(raw, null, 2));
 
   if (!res.ok) {
-    const message =
-      (raw as any)?.message ||
-      (raw as any)?.error ||
-      `Request failed (${res.status})`;
+    const message = `Request failed (${res.status})`;
     throw new Error(message);
   }
 
   // Support both flat { token, user } and wrapped { data: { token, user } }
-  const data: AuthResponse = (raw as any)?.data ?? raw;
+  const data: AuthResponse = raw?.data ?? raw;
   console.log(
     "[loginUser] mapped data – token:",
     data.token,
