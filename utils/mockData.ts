@@ -50,6 +50,33 @@ export const generateMockDangerZones = (): DangerZone[] => [
     count: 3,
     lastUpdated: new Date(Date.now() - 5400000),
   },
+  {
+    id: 'danger-5',
+    center: { latitude: 23.857572, longitude: 90.364674, timestamp: new Date() },
+    radius: 0.3,
+    severity: 'medium',
+    type: 'Crime Hotspot',
+    count: 3,
+    lastUpdated: new Date(Date.now() - 5400000),
+  },
+  {
+    id: 'danger-6',
+    center: { latitude: 23.851705, longitude: 90.339051, timestamp: new Date() },
+    radius: 0.2,
+    severity: 'high',
+    type: 'Crime Hotspot',
+    count: 3,
+    lastUpdated: new Date(Date.now() - 5400000),
+  },
+  {
+    id: 'danger-7',
+    center: { latitude: 23.875002, longitude: 90.322853, timestamp: new Date() },
+    radius: 0.4,
+    severity: 'high',
+    type: 'Isolated Road',
+    count: 3,
+    lastUpdated: new Date(Date.now() - 5400000),
+  },
 ];
 
 // Mock SOS responders

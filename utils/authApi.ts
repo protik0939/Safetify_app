@@ -1,11 +1,15 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Platform } from "react-native";
 
-// Android emulator uses 10.0.2.2 to reach the host machine's localhost
-export const BASE_URL =
+const PRIMARY_BASE_URL = "https://safetify-backend.vercel.app/api/v1";
+
+// Current local API fallback (used only if the hosted API is unavailable).
+const FALLBACK_BASE_URL =
   Platform.OS === "android"
     ? "http://192.168.110.189:5000/api/v1"
     : "http://localhost:5000/api/v1";
+
+export const BASE_URL = PRIMARY_BASE_URL;
 
 const SESSION_TOKEN_KEY = "safetify_session_token";
 
@@ -81,6 +85,25 @@ async function handleResponse<T>(res: Response): Promise<T> {
   return data as T;
 }
 
+async function fetchWithBaseUrlFallback(
+  path: string,
+  init: RequestInit,
+): Promise<Response> {
+  const primaryUrl = `${PRIMARY_BASE_URL}${path}`;
+
+  try {
+    const primaryRes = await fetch(primaryUrl, init);
+    // If endpoint is missing/unavailable, retry with current local API.
+    if (![404, 502, 503, 504].includes(primaryRes.status)) {
+      return primaryRes;
+    }
+  } catch {
+    // Network-level failure on primary API will fall back below.
+  }
+
+  return fetch(`${FALLBACK_BASE_URL}${path}`, init);
+}
+
 // ---------------------------------------------------------------------------
 // Auth API calls
 // ---------------------------------------------------------------------------
@@ -88,7 +111,7 @@ async function handleResponse<T>(res: Response): Promise<T> {
 export async function registerUser(
   payload: RegisterPayload,
 ): Promise<AuthResponse> {
-  const res = await fetch(`${BASE_URL}/auth/register`, {
+  const res = await fetchWithBaseUrlFallback("/auth/register", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
@@ -119,7 +142,7 @@ export async function registerUser(
 }
 
 export async function loginUser(payload: LoginPayload): Promise<AuthResponse> {
-  const res = await fetch(`${BASE_URL}/auth/login`, {
+  const res = await fetchWithBaseUrlFallback("/auth/login", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),

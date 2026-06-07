@@ -21,6 +21,11 @@ interface AppState {
   notifications: PushNotification[];
   isSOSActive: boolean;
   sosHoldProgress: number;
+  // Background location tracking
+  isBackgroundTrackingEnabled: boolean;
+  lastDangerZoneNotificationTime: number; // timestamp to prevent notification spam
+  notifiedDangerZones: string[]; // zone IDs we've already notified about
+  backgroundTrackingStartedAt: number | null;
 
   // Actions
   setUser: (user: User | null) => void;
@@ -32,6 +37,9 @@ interface AppState {
   removeNotification: (id: string) => void;
   setSOSActive: (active: boolean) => void;
   setSOSHoldProgress: (progress: number) => void;
+  setBackgroundTrackingEnabled: (enabled: boolean) => void;
+  recordDangerZoneNotification: (zoneId: string) => void;
+  clearDangerZoneNotificationHistory: () => void;
   logout: () => void;
   addSOSToHistory: (sos: SOSRequest) => void;
   clearNotifications: () => void;
@@ -51,6 +59,10 @@ export const useAppStore = create<AppState>()(
       notifications: [],
       isSOSActive: false,
       sosHoldProgress: 0,
+      isBackgroundTrackingEnabled: false,
+      lastDangerZoneNotificationTime: 0,
+      notifiedDangerZones: [],
+      backgroundTrackingStartedAt: null,
 
       setUser: (user) => set({ user, isAuthenticated: !!user }),
       setSessionToken: (sessionToken) => set({ sessionToken }),
@@ -69,6 +81,25 @@ export const useAppStore = create<AppState>()(
       clearNotifications: () => set({ notifications: [] }),
       setSOSActive: (isSOSActive) => set({ isSOSActive }),
       setSOSHoldProgress: (sosHoldProgress) => set({ sosHoldProgress }),
+      setBackgroundTrackingEnabled: (isBackgroundTrackingEnabled) =>
+        set({
+          isBackgroundTrackingEnabled,
+          backgroundTrackingStartedAt: isBackgroundTrackingEnabled
+            ? Date.now()
+            : null,
+        }),
+      recordDangerZoneNotification: (zoneId) =>
+        set((state) => ({
+          lastDangerZoneNotificationTime: Date.now(),
+          notifiedDangerZones: Array.from(
+            new Set([...state.notifiedDangerZones, zoneId])
+          ),
+        })),
+      clearDangerZoneNotificationHistory: () =>
+        set({
+          notifiedDangerZones: [],
+          lastDangerZoneNotificationTime: 0,
+        }),
       addSOSToHistory: (sos) =>
         set((state) => ({
           sosHistory: [sos, ...state.sosHistory],
@@ -81,6 +112,8 @@ export const useAppStore = create<AppState>()(
           currentLocation: null,
           userLocation: null,
           activeSOSRequest: null,
+          isBackgroundTrackingEnabled: false,
+          notifiedDangerZones: [],
         }),
     }),
     {
