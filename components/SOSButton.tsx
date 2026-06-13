@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Animated, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import Toast from 'react-native-toast-message';
+import Toast from '@/components/AppToast';
 import { useAppStore } from '../store/useAppStore';
 import { generateMockSOSRequest } from '../utils/mockData';
 
@@ -253,13 +253,14 @@ export default function SOSButton() {
 const styles = StyleSheet.create({
   loadingBarContainer: {
     position: 'absolute',
-    top: 60,
+    top: '50%',
     left: 20,
     right: 20,
+    transform: [{ translateY: -40 }],
     zIndex: 1000,
   },
   loadingBarContent: {
-    backgroundColor: 'rgba(0, 0, 0, 0.85)',
+    backgroundColor: 'rgba(255, 240, 233, 0.85)',
     borderRadius: 12,
     padding: 16,
     shadowColor: '#000',
@@ -269,7 +270,7 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   loadingBarText: {
-    color: '#fff',
+    color: '#000000',
     fontSize: 14,
     fontWeight: '600',
     marginBottom: 10,
@@ -283,7 +284,7 @@ const styles = StyleSheet.create({
   },
   loadingBarFill: {
     height: '100%',
-    backgroundColor: '#ef4444',
+    backgroundColor: '#f09129',
     borderRadius: 3,
   },
   container: {
@@ -297,7 +298,7 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 45,
-    backgroundColor: '#ef4444',
+    backgroundColor: '#f09129',
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
@@ -306,10 +307,10 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 10,
     borderWidth: 1,
-    borderColor: '#fff',
+    borderColor: '#fff7ed',
   },
   sosButtonActive: {
-    backgroundColor: '#dc2626',
+    backgroundColor: '#f09129',
   },
   sosText: {
     fontSize: 22,
@@ -328,7 +329,7 @@ const styles = StyleSheet.create({
     right: 20,
   },
   sosActiveCard: {
-    backgroundColor: '#dc2626',
+    backgroundColor: '#f09129',
     borderRadius: 16,
     padding: 20,
     shadowColor: '#000',
@@ -345,7 +346,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   sosButtonDisabled: {
-    backgroundColor: '#7f1d1d',
+    backgroundColor: '#1e315f',
     opacity: 0.9,
   },
   sosTimerText: {
@@ -372,12 +373,12 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.8)',
   },
   cancelButton: {
-    backgroundColor: '#fff',
+    backgroundColor: '#fff7ed',
     borderRadius: 12,
     padding: 16,
   },
   cancelButtonText: {
-    color: '#dc2626',
+    color: '#1e315f',
     fontSize: 16,
     fontWeight: '600',
     textAlign: 'center',

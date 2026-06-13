@@ -72,7 +72,7 @@ export function BatteryOptimizationModal() {
                     <Text style={styles.infoTitle}>Battery Restriction</Text>
                   </View>
                   <Text style={styles.infoText}>
-                    Set to "No restriction" to ensure Safetify continues
+                    Set to &quot;No restriction&quot; to ensure Safetify continues
                     monitoring your location in the background for safety
                     alerts.
                   </Text>
@@ -104,7 +104,7 @@ export function BatteryOptimizationModal() {
                 />
                 <Text style={styles.warningText}>
                   Without these settings, background location tracking may stop,
-                  and you won't receive danger zone alerts.
+                  and you won&apos;t receive danger zone alerts.
                 </Text>
               </View>
 
@@ -152,7 +152,7 @@ export function BatteryOptimizationModal() {
                   activeOpacity={0.6}
                 >
                   <Text style={styles.dismissButtonText}>
-                    I'll configure later
+                    I&apos;ll configure later
                   </Text>
                 </TouchableOpacity>
               </View>

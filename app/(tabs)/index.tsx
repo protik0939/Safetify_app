@@ -1,12 +1,13 @@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Animated, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import Toast from 'react-native-toast-message';
+import Toast from '@/components/AppToast';
 import { WebView } from 'react-native-webview';
 import SafetifyLogo from '../../assets/images/safetifyLogo.svg';
 import { useAppStore } from '../../store/useAppStore';
 import { getCurrentLocation, watchLocation } from '../../utils/location';
 import { generateMockDangerZones } from '../../utils/mockData';
+import { AppColors } from '@/constants/theme';
 
 const getSeverityColor = (severity: string) => {
   switch (severity) {
@@ -236,7 +237,7 @@ export default function DashboardScreen() {
           </View>
           <TouchableOpacity style={styles.menuButton} onPress={toggleMenu} activeOpacity={0.7}>
             {
-              menuVisible ? <Ionicons name="chevron-up" size={24} color="#fff" /> : <Ionicons name="menu" size={24} color="#fff" />}
+              menuVisible ? <Ionicons name="chevron-up" size={24} color="#rgba(15, 23, 42, 0.97)" /> : <Ionicons name="menu" size={24} color="rgba(15, 23, 42, 0.97)" />}
           </TouchableOpacity>
         </View>
       </View>
@@ -275,25 +276,25 @@ export default function DashboardScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0f172a',
+    backgroundColor: AppColors.background,
   },
   map: {
     flex: 1,
   },
   permissionContainer: {
     flex: 1,
-    backgroundColor: '#0f172a',
+    backgroundColor: AppColors.background,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 24,
   },
   permissionCard: {
-    backgroundColor: '#1e293b',
+    backgroundColor: AppColors.background,
     borderRadius: 16,
     padding: 32,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: AppColors.border,
   },
   permissionIcon: {
     fontSize: 60,
@@ -302,18 +303,18 @@ const styles = StyleSheet.create({
   permissionTitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#fff',
+    color: AppColors.foreground,
     marginBottom: 12,
     textAlign: 'center',
   },
   permissionText: {
     fontSize: 16,
-    color: '#94a3b8',
+    color: AppColors.foreground,
     textAlign: 'center',
     marginBottom: 32,
   },
   permissionButton: {
-    backgroundColor: '#ef4444',
+    backgroundColor: AppColors.themeColor,
     borderRadius: 12,
     paddingHorizontal: 32,
     paddingVertical: 16,
@@ -324,7 +325,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   permissionButtonText: {
-    color: '#fff',
+    color: AppColors.foreground,
     fontSize: 16,
     fontWeight: '600',
   },
@@ -333,7 +334,7 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    backgroundColor: 'rgba(15, 23, 42, 0.97)',
+    backgroundColor: AppColors.background,
     paddingTop: 50,
     paddingBottom: 16,
     zIndex: 10,
@@ -352,11 +353,11 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 25,
     fontWeight: 'bold',
-    color: '#fff',
+    color: AppColors.foreground,
   },
   headerSubtitle: {
     fontSize: 8,
-    color: '#94a3b8',
+    color: AppColors.foreground,
     marginTop: 0,
     paddingLeft: 5,
   },
@@ -365,7 +366,7 @@ const styles = StyleSheet.create({
     top: 110,
     left: 0,
     right: 0,
-    backgroundColor: 'rgba(15, 23, 42, 0.97)',
+    backgroundColor: AppColors.background,
     paddingBottom: 12,
     zIndex: 9,
     margin: 10,
@@ -419,13 +420,13 @@ const styles = StyleSheet.create({
     letterSpacing: 0.3,
   },
   dangerZoneCard: {
-    backgroundColor: '#1e293b',
+    backgroundColor: AppColors.background,
     borderRadius: 12,
     padding: 16,
     marginRight: 12,
     minWidth: 150,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: AppColors.border,
   },
   severityBadge: {
     alignSelf: 'flex-start',
@@ -435,18 +436,18 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   severityText: {
-    color: '#fff',
+    color: AppColors.foreground,
     fontSize: 10,
     fontWeight: 'bold',
   },
   dangerZoneType: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#fff',
+    color: AppColors.foreground,
     marginBottom: 4,
   },
   dangerZoneCount: {
     fontSize: 12,
-    color: '#94a3b8',
+    color: AppColors.foreground,
   },
 });

@@ -1,10 +1,11 @@
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import Toast from 'react-native-toast-message';
+import Toast from '@/components/AppToast';
 import SafetifyLogo from '../assets/images/safetifyLogo.svg';
 import { useAppStore } from '../store/useAppStore';
 import { registerUser } from '../utils/authApi';
+import { AppColors } from '@/constants/theme';
 
 export default function SignupScreen() {
   const router = useRouter();
@@ -169,7 +170,7 @@ export default function SignupScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0f172a',
+    backgroundColor: AppColors.background,
   },
   scrollContent: {
     flexGrow: 1,
@@ -190,12 +191,12 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 32,
     fontWeight: 'bold',
-    color: '#fff',
+    color: AppColors.foreground,
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 16,
-    color: '#94a3b8',
+    color: AppColors.foreground,
   },
   form: {
     gap: 16,
@@ -206,20 +207,20 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#cbd5e1',
+    color: AppColors.foreground,
   },
   input: {
-    backgroundColor: '#334155',
+    backgroundColor: AppColors.background,
     borderWidth: 1,
-    borderColor: '#475569',
+    borderColor: AppColors.border,
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 12,
     fontSize: 16,
-    color: '#fff',
+    color: AppColors.foreground,
   },
   button: {
-    backgroundColor: '#ef4444',
+    backgroundColor: AppColors.themeColor,
     borderRadius: 12,
     paddingVertical: 16,
     marginTop: 8,
@@ -228,7 +229,7 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   buttonText: {
-    color: '#fff',
+    color: AppColors.foreground,
     fontSize: 16,
     fontWeight: '600',
     textAlign: 'center',
@@ -239,10 +240,10 @@ const styles = StyleSheet.create({
   },
   footerText: {
     fontSize: 14,
-    color: '#94a3b8',
+    color: AppColors.foreground,
   },
   link: {
-    color: '#ef4444',
+    color: AppColors.themeColor,
     fontWeight: '600',
   },
 });

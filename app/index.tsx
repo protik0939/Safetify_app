@@ -3,6 +3,7 @@ import { useEffect } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import SafetifyLogo from '../assets/images/safetifyLogo.svg';
 import { useAppStore } from '../store/useAppStore';
+import { AppColors } from '@/constants/theme';
 
 export default function IndexScreen() {
   const router = useRouter();
@@ -27,7 +28,7 @@ export default function IndexScreen() {
         <Text style={styles.title}>Safetify</Text>
         <Text style={styles.subtitle}>Community Safety Platform</Text>
       </View>
-      <ActivityIndicator size="large" color="#ef4444" style={styles.loader} />
+      <ActivityIndicator size="large" color="#f0912b" style={styles.loader} />
     </View>
   );
 }
@@ -35,7 +36,7 @@ export default function IndexScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0f172a',
+    backgroundColor: AppColors.background,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -48,12 +49,12 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 36,
     fontWeight: 'bold',
-    color: '#fff',
+    color: AppColors.themeColor,
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 16,
-    color: '#94a3b8',
+    color: AppColors.foreground,
   },
   loader: {
     marginTop: 32,

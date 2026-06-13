@@ -1,11 +1,11 @@
 import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { useAppStore } from "@/store/useAppStore";
+import Toast from "@/components/AppToast";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
 import "react-native-reanimated";
-import Toast from "react-native-toast-message";
 
 void SplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -58,6 +58,7 @@ export default function RootLayout() {
       console.warn("[App] Push notification error:", error);
     }
   }, [expoPushToken, error]);
+  
 
   return (
     <>
@@ -67,7 +68,7 @@ export default function RootLayout() {
         <Stack.Screen name="signup" />
         <Stack.Screen name="(tabs)" />
       </Stack>
-      <StatusBar style="light" />
+      <StatusBar style="dark" backgroundColor="#f09129" translucent={false} />
       <Toast />
     </>
   );

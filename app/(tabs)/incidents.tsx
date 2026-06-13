@@ -1,4 +1,4 @@
-import { lastSectionStyle } from '@/constants/theme';
+import { AppColors, lastSectionStyle } from '@/constants/theme';
 import { format } from 'date-fns';
 import React, { useEffect, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
@@ -170,7 +170,7 @@ export default function IncidentsScreen() {
             onPress={() => setShowAddForm((previous) => !previous)}
           >
             <Text style={styles.addIncidentButtonText}>
-              {showAddForm ? 'Hide Form' : 'Add Incident'}
+              {showAddForm ? 'Close Form' : 'Add Incident'}
             </Text>
           </TouchableOpacity>
 
@@ -293,29 +293,29 @@ export default function IncidentsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0f172a',
+    backgroundColor: AppColors.background,
   },
   header: {
     paddingTop: 60,
     paddingHorizontal: 20,
     paddingBottom: 20,
-    backgroundColor: '#1e293b',
+    backgroundColor: AppColors.background,
     borderBottomWidth: 1,
-    borderBottomColor: '#334155',
+    borderBottomColor: AppColors.border,
   },
   headerTitle: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#fff',
+    color: AppColors.foreground,
     marginBottom: 4,
   },
   headerSubtitle: {
     fontSize: 14,
-    color: '#94a3b8',
+    color: AppColors.foreground,
   },
   backButton: {
     fontSize: 16,
-    color: '#ef4444',
+    color: AppColors.themeColor,
     fontWeight: '600',
   },
   content: {
@@ -323,7 +323,7 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   addIncidentButton: {
-    backgroundColor: '#ef4444',
+    backgroundColor: AppColors.themeColor,
     paddingVertical: 12,
     borderRadius: 10,
     alignItems: 'center',
@@ -335,25 +335,25 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   formCard: {
-    backgroundColor: '#1e293b',
+    backgroundColor: AppColors.background,
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: AppColors.border,
   },
   formTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#fff',
+    color: AppColors.foreground,
     marginBottom: 12,
   },
   input: {
-    backgroundColor: '#0f172a',
+    backgroundColor: AppColors.background,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: AppColors.border,
     borderRadius: 8,
-    color: '#fff',
+    color: AppColors.foreground,
     paddingHorizontal: 12,
     paddingVertical: 10,
     marginBottom: 10,
@@ -377,7 +377,7 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   saveButton: {
-    backgroundColor: '#ef4444',
+    backgroundColor: '#f0912b',
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 8,
@@ -397,12 +397,12 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   incidentCard: {
-    backgroundColor: '#1e293b',
+    backgroundColor: AppColors.background,
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: AppColors.border,
   },
   severityBadge: {
     alignSelf: 'flex-start',
@@ -419,17 +419,17 @@ const styles = StyleSheet.create({
   incidentTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#fff',
+    color: AppColors.foreground,
     marginBottom: 4,
   },
   incidentDate: {
     fontSize: 12,
-    color: '#94a3b8',
+    color: AppColors.foreground,
     marginBottom: 8,
   },
   incidentDescription: {
     fontSize: 14,
-    color: '#cbd5e1',
+    color: AppColors.foreground,
     marginBottom: 12,
   },
   incidentStats: {
@@ -438,34 +438,34 @@ const styles = StyleSheet.create({
   },
   incidentStat: {
     fontSize: 14,
-    color: '#94a3b8',
+    color: AppColors.foreground,
   },
   detailCard: {
-    backgroundColor: '#1e293b',
+    backgroundColor: AppColors.background,
     borderRadius: 12,
     padding: 20,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: AppColors.border,
   },
   detailTitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#fff',
+    color: AppColors.foreground,
     marginBottom: 8,
   },
   detailDate: {
     fontSize: 14,
-    color: '#94a3b8',
+    color: AppColors.foreground,
     marginBottom: 16,
   },
   divider: {
     height: 1,
-    backgroundColor: '#334155',
+    backgroundColor: AppColors.border,
     marginVertical: 16,
   },
   detailDescription: {
     fontSize: 16,
-    color: '#cbd5e1',
+    color: AppColors.foreground,
     lineHeight: 24,
     marginBottom: 16,
   },
@@ -480,29 +480,29 @@ const styles = StyleSheet.create({
   statValue: {
     fontSize: 32,
     fontWeight: 'bold',
-    color: '#ef4444',
+    color: AppColors.themeColor,
     marginBottom: 4,
   },
   statLabel: {
     fontSize: 12,
-    color: '#94a3b8',
+    color: AppColors.foreground,
   },
   infoSection: {
     marginBottom: 12,
   },
   infoLabel: {
     fontSize: 12,
-    color: '#94a3b8',
+    color: AppColors.foreground,
     marginBottom: 4,
   },
   infoValue: {
     fontSize: 16,
-    color: '#fff',
+    color: AppColors.foreground,
   },
   storiesTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#fff',
+    color: AppColors.foreground,
     marginBottom: 16,
   },
   storyItem: {
@@ -511,13 +511,13 @@ const styles = StyleSheet.create({
   },
   storyBullet: {
     fontSize: 16,
-    color: '#ef4444',
+    color: AppColors.themeColor,
     marginRight: 8,
   },
   storyText: {
     flex: 1,
     fontSize: 14,
-    color: '#cbd5e1',
+    color: AppColors.foreground,
     lineHeight: 20,
   },
 });

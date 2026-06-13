@@ -1,24 +1,33 @@
-import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
-import { KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import Toast from 'react-native-toast-message';
-import SafetifyLogo from '../assets/images/safetifyLogo.svg';
-import { useAppStore } from '../store/useAppStore';
-import { loginUser } from '../utils/authApi';
+import { useRouter } from "expo-router";
+import React, { useState } from "react";
+import {
+  KeyboardAvoidingView,
+  Platform,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import Toast from "@/components/AppToast";
+import SafetifyLogo from "../assets/images/safetifyLogo.svg";
+import { useAppStore } from "../store/useAppStore";
+import { loginUser } from "../utils/authApi";
+import { AppColors } from "@/constants/theme";
 
 export default function LoginScreen() {
   const router = useRouter();
   const { setUser, setSessionToken } = useAppStore();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
   const handleLogin = async () => {
     if (!email || !password) {
       Toast.show({
-        type: 'error',
-        text1: 'Error',
-        text2: 'Please fill all fields',
+        type: "error",
+        text1: "Error",
+        text2: "Please fill all fields",
       });
       return;
     }
@@ -31,7 +40,7 @@ export default function LoginScreen() {
         id: apiUser.id,
         name: apiUser.name,
         email: apiUser.email,
-        phone: '',
+        phone: "",
         location: { latitude: 0, longitude: 0, timestamp: new Date() },
         createdAt: new Date(apiUser.createdAt),
         emergencyContacts: [],
@@ -39,26 +48,38 @@ export default function LoginScreen() {
         avatar: apiUser.image ?? undefined,
       });
       Toast.show({
-        type: 'success',
-        text1: 'Success',
-        text2: 'Login successful!',
+        type: "success",
+        text1: "Success",
+        text2: "Login successful!",
       });
-      router.replace('/(tabs)');
+      router.replace("/(tabs)");
     } catch (err: any) {
       Toast.show({
-        type: 'error',
-        text1: 'Login failed',
-        text2: err?.message ?? 'Something went wrong',
+        type: "error",
+        text1: "Login failed",
+        text2: err?.message ?? "Something went wrong",
       });
     } finally {
       setIsLoading(false);
     }
   };
 
+  const fillDemoCredentials = () => {
+    setEmail("demo@safetify.com");
+    setPassword("D3m0P@55w0rd");
+
+    Toast.show({
+      type: "success",
+      text1: "Demo credentials loaded",
+    });
+  };
+
+  
+
   return (
-    <KeyboardAvoidingView 
+    <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
       <View style={styles.content}>
         <View style={styles.logoContainer}>
@@ -99,24 +120,34 @@ export default function LoginScreen() {
             disabled={isLoading}
           >
             <Text style={styles.buttonText}>
-              {isLoading ? 'Logging in...' : 'Login'}
+              {isLoading ? "Logging in..." : "Login"}
             </Text>
           </TouchableOpacity>
         </View>
 
         <View style={styles.footer}>
           <Text style={styles.footerText}>
-            Don&apos;t have an account?{' '}
-            <Text style={styles.link} onPress={() => router.push('/signup')}>
+            Don&apos;t have an account?{" "}
+            <Text style={styles.link} onPress={() => router.push("/signup")}>
               Sign up
             </Text>
           </Text>
         </View>
 
         <View style={styles.demoCredentials}>
-          <Text style={styles.demoTitle}>Demo Credentials:</Text>
+          <View style={styles.demoHeader}>
+            <Text style={styles.demoTitle}>Demo Credentials</Text>
+
+            <TouchableOpacity
+              style={styles.useButton}
+              onPress={fillDemoCredentials}
+            >
+              <Text style={styles.useButtonText}>Use</Text>
+            </TouchableOpacity>
+          </View>
+
           <Text style={styles.demoText}>Email: demo@safetify.com</Text>
-          <Text style={styles.demoText}>Password: demo123</Text>
+          <Text style={styles.demoText}>Password: D3m0P@55w0rd</Text>
         </View>
       </View>
     </KeyboardAvoidingView>
@@ -126,15 +157,15 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0f172a',
+    backgroundColor: AppColors.background,
   },
   content: {
     flex: 1,
-    justifyContent: 'center',
+    justifyContent: "center",
     paddingHorizontal: 24,
   },
   logoContainer: {
-    alignItems: 'center',
+    alignItems: "center",
     marginBottom: 48,
   },
   logoImage: {
@@ -142,13 +173,13 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 32,
-    fontWeight: 'bold',
-    color: '#fff',
+    fontWeight: "bold",
+    color: AppColors.foreground,
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 16,
-    color: '#94a3b8',
+    color: AppColors.foreground,
   },
   form: {
     gap: 16,
@@ -158,21 +189,21 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 14,
-    fontWeight: '500',
-    color: '#cbd5e1',
+    fontWeight: "500",
+    color: AppColors.foreground,
   },
   input: {
-    backgroundColor: '#334155',
+    backgroundColor: AppColors.background,
     borderWidth: 1,
-    borderColor: '#475569',
+    borderColor: AppColors.border,
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 12,
     fontSize: 16,
-    color: '#fff',
+    color: AppColors.foreground,
   },
   button: {
-    backgroundColor: '#ef4444',
+    backgroundColor: AppColors.themeColor,
     borderRadius: 12,
     paddingVertical: 16,
     marginTop: 8,
@@ -181,36 +212,55 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   buttonText: {
-    color: '#fff',
+    color: AppColors.foreground,
     fontSize: 16,
-    fontWeight: '600',
-    textAlign: 'center',
+    fontWeight: "600",
+    textAlign: "center",
   },
   footer: {
     marginTop: 24,
-    alignItems: 'center',
+    alignItems: "center",
   },
   footerText: {
     fontSize: 14,
-    color: '#94a3b8',
+    color: AppColors.foreground,
   },
   link: {
-    color: '#ef4444',
-    fontWeight: '600',
+    color: AppColors.themeColor,
+    fontWeight: "600",
   },
   demoCredentials: {
     marginTop: 24,
-    backgroundColor: '#334155',
+    backgroundColor: AppColors.background,
     borderRadius: 12,
     padding: 16,
   },
   demoTitle: {
     fontSize: 12,
-    color: '#94a3b8',
+    color: AppColors.foreground,
     marginBottom: 8,
   },
   demoText: {
     fontSize: 14,
-    color: '#cbd5e1',
+    color: AppColors.foreground,
   },
+  demoHeader: {
+  flexDirection: 'row',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  marginBottom: 8,
+},
+
+useButton: {
+  backgroundColor: AppColors.themeColor,
+  paddingHorizontal: 12,
+  paddingVertical: 6,
+  borderRadius: 8,
+},
+
+useButtonText: {
+  color: AppColors.foreground,
+  fontSize: 12,
+  fontWeight: '600',
+},
 });

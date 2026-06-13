@@ -9,7 +9,7 @@
 
 import { useEffect, useState } from "react";
 import { Button, ScrollView, StyleSheet, Text, View } from "react-native";
-import Toast from "react-native-toast-message";
+import Toast from "@/components/AppToast";
 import { useBackgroundLocationSetup } from "../hooks/useBackgroundLocationSetup";
 import { useAppStore } from "../store/useAppStore";
 

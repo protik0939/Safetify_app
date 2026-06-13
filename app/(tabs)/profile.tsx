@@ -1,5 +1,5 @@
-import { lastSectionStyle } from '@/constants/theme';
-import { usePushNotifications } from '@/hooks/usePushNotifications';
+import { AppColors, lastSectionStyle } from "@/constants/theme";
+import { usePushNotifications } from "@/hooks/usePushNotifications";
 import {
     cancelAllNotifications,
     clearBadge,
@@ -8,27 +8,27 @@ import {
     sendEmergencyContactAlert,
     sendSOSAlert,
     sendSOSResolvedNotification,
-} from '@/utils/notifications';
-import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import React from 'react';
+} from "@/utils/notifications";
+import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
+import React from "react";
 import {
     ScrollView,
     StyleSheet,
     Text,
     TouchableOpacity,
     View,
-} from 'react-native';
-import Toast from 'react-native-toast-message';
-import { useAppStore } from '../../store/useAppStore';
-import { clearSessionToken } from '../../utils/authApi';
+} from "react-native";
+import Toast from "react-native-toast-message";
+import { useAppStore } from "../../store/useAppStore";
+import { clearSessionToken } from "../../utils/authApi";
 
 // ─── Small helper to show a toast after triggering a test notification ────────
 function notifySuccess(label: string) {
-  Toast.show({ type: 'success', text1: 'Notification Sent', text2: label });
+  Toast.show({ type: "success", text1: "Notification Sent", text2: label });
 }
 function notifyInfo(label: string) {
-  Toast.show({ type: 'info', text1: 'Scheduled', text2: label });
+  Toast.show({ type: "info", text1: "Scheduled", text2: label });
 }
 
 export default function ProfileScreen() {
@@ -43,11 +43,11 @@ export default function ProfileScreen() {
     await clearSessionToken();
     logout();
     Toast.show({
-      type: 'success',
-      text1: 'Success',
-      text2: 'Logged out successfully',
+      type: "success",
+      text1: "Success",
+      text2: "Logged out successfully",
     });
-    router.replace('/login');
+    router.replace("/login");
   };
 
   return (
@@ -61,7 +61,9 @@ export default function ProfileScreen() {
           <>
             <View style={styles.profileCard}>
               <View style={styles.avatar}>
-                <Text style={styles.avatarText}>{user.name.charAt(0).toUpperCase()}</Text>
+                <Text style={styles.avatarText}>
+                  {user.name.charAt(0).toUpperCase()}
+                </Text>
               </View>
               <Text style={styles.userName}>{user.name}</Text>
               <Text style={styles.userEmail}>{user.email}</Text>
@@ -75,8 +77,13 @@ export default function ProfileScreen() {
                       styles.riskScoreFill,
                       {
                         width: `${user.riskScore}%`,
-                        backgroundColor: user.riskScore > 70 ? '#22c55e' : user.riskScore > 40 ? '#eab308' : '#ef4444'
-                      }
+                        backgroundColor:
+                          user.riskScore > 70
+                            ? "#22c55e"
+                            : user.riskScore > 40
+                              ? "#eab308"
+                              : "#f0912b",
+                      },
                     ]}
                   />
                 </View>
@@ -99,7 +106,8 @@ export default function ProfileScreen() {
                 <View style={styles.infoText}>
                   <Text style={styles.infoLabel}>Location</Text>
                   <Text style={styles.infoValue}>
-                    {user.location.latitude.toFixed(4)}, {user.location.longitude.toFixed(4)}
+                    {user.location.latitude.toFixed(4)},{" "}
+                    {user.location.longitude.toFixed(4)}
                   </Text>
                 </View>
               </View>
@@ -136,18 +144,20 @@ export default function ProfileScreen() {
                 {/* Permission row */}
                 <View style={styles.notifStatusRow}>
                   <Ionicons
-                    name={permissionGranted ? 'checkmark-circle' : 'close-circle'}
+                    name={
+                      permissionGranted ? "checkmark-circle" : "close-circle"
+                    }
                     size={18}
-                    color={permissionGranted ? '#22c55e' : '#ef4444'}
+                    color={permissionGranted ? "#22c55e" : "#f0912b"}
                   />
                   <Text style={styles.notifStatusLabel}>Permission</Text>
                   <Text
                     style={[
                       styles.notifStatusValue,
-                      { color: permissionGranted ? '#22c55e' : '#ef4444' },
+                      { color: permissionGranted ? "#22c55e" : "#f0912b" },
                     ]}
                   >
-                    {permissionGranted ? 'Granted' : 'Denied'}
+                    {permissionGranted ? "Granted" : "Denied"}
                   </Text>
                 </View>
 
@@ -155,8 +165,12 @@ export default function ProfileScreen() {
                 <View style={styles.notifStatusRow}>
                   <Ionicons name="key" size={18} color="#94a3b8" />
                   <Text style={styles.notifStatusLabel}>Push Token</Text>
-                  <Text style={styles.notifTokenValue} numberOfLines={1} ellipsizeMode="middle">
-                    {expoPushToken ?? 'Not available (use real device)'}
+                  <Text
+                    style={styles.notifTokenValue}
+                    numberOfLines={1}
+                    ellipsizeMode="middle"
+                  >
+                    {expoPushToken ?? "Not available (use real device)"}
                   </Text>
                 </View>
 
@@ -164,7 +178,9 @@ export default function ProfileScreen() {
                 {error && (
                   <View style={styles.notifStatusRow}>
                     <Ionicons name="warning" size={18} color="#f59e0b" />
-                    <Text style={[styles.notifStatusLabel, { color: '#f59e0b' }]}>
+                    <Text
+                      style={[styles.notifStatusLabel, { color: "#f59e0b" }]}
+                    >
                       {error}
                     </Text>
                   </View>
@@ -172,8 +188,19 @@ export default function ProfileScreen() {
 
                 {/* Last received notification */}
                 {notification && (
-                  <View style={[styles.notifStatusRow, { marginTop: 8, flexDirection: 'column', alignItems: 'flex-start' }]}>
-                    <Text style={[styles.notifStatusLabel, { marginBottom: 4 }]}>
+                  <View
+                    style={[
+                      styles.notifStatusRow,
+                      {
+                        marginTop: 8,
+                        flexDirection: "column",
+                        alignItems: "flex-start",
+                      },
+                    ]}
+                  >
+                    <Text
+                      style={[styles.notifStatusLabel, { marginBottom: 4 }]}
+                    >
                       Last Received:
                     </Text>
                     <Text style={styles.notifLastTitle}>
@@ -188,60 +215,78 @@ export default function ProfileScreen() {
 
               {/* ── Explanation card ─────────────────────────────────────── */}
               <View style={styles.notifInfoCard}>
-                <Text style={styles.notifInfoTitle}>How Push Notifications Work</Text>
+                <Text style={styles.notifInfoTitle}>
+                  How Push Notifications Work
+                </Text>
                 <Text style={styles.notifInfoText}>
-                  {'1. App requests permission from the OS.\n'}
-                  {'2. OS returns a push token (device identifier).\n'}
-                  {'3. Token is sent to your backend server.\n'}
-                  {'4. Server calls Expo Push API with token + message.\n'}
-                  {'5. Expo relays it through FCM (Android) / APNs (iOS).\n'}
-                  {'6. Device wakes up and shows the notification.\n\n'}
-                  {'Local (test) notifications skip steps 3–5 and fire directly.'}
+                  {"1. App requests permission from the OS.\n"}
+                  {"2. OS returns a push token (device identifier).\n"}
+                  {"3. Token is sent to your backend server.\n"}
+                  {"4. Server calls Expo Push API with token + message.\n"}
+                  {"5. Expo relays it through FCM (Android) / APNs (iOS).\n"}
+                  {"6. Device wakes up and shows the notification.\n\n"}
+                  {
+                    "Local (test) notifications skip steps 3–5 and fire directly."
+                  }
                 </Text>
               </View>
 
               {/* ── Test buttons ─────────────────────────────────────────── */}
-              <Text style={styles.notifTestTitle}>Fire a Test Notification</Text>
+              <Text style={styles.notifTestTitle}>
+                Fire a Test Notification
+              </Text>
 
               <TouchableOpacity
                 style={styles.notifButton}
                 onPress={async () => {
-                  await sendSOSAlert('Alex Johnson', 'Central Park, NY');
-                  notifySuccess('SOS Alert fired immediately');
+                  await sendSOSAlert("Alex Johnson", "Central Park, NY");
+                  notifySuccess("SOS Alert fired immediately");
                 }}
               >
-                <Ionicons name="alert-circle" size={20} color="#ef4444" />
+                <Ionicons name="alert-circle" size={20} color="#f0912b" />
                 <View style={styles.notifBtnText}>
-                  <Text style={styles.notifBtnLabel}>SOS Alert (immediate)</Text>
-                  <Text style={styles.notifBtnDesc}>Simulates a nearby SOS received from another user</Text>
+                  <Text style={styles.notifBtnLabel}>
+                    SOS Alert (immediate)
+                  </Text>
+                  <Text style={styles.notifBtnDesc}>
+                    Simulates a nearby SOS received from another user
+                  </Text>
                 </View>
               </TouchableOpacity>
 
               <TouchableOpacity
                 style={styles.notifButton}
                 onPress={async () => {
-                  await sendDangerZoneWarning('Downtown District', 'high');
-                  notifySuccess('Danger Zone warning fired');
+                  await sendDangerZoneWarning("Downtown District", "high");
+                  notifySuccess("Danger Zone warning fired");
                 }}
               >
                 <Ionicons name="warning" size={20} color="#f59e0b" />
                 <View style={styles.notifBtnText}>
-                  <Text style={styles.notifBtnLabel}>Danger Zone Warning (immediate)</Text>
-                  <Text style={styles.notifBtnDesc}>Simulates entering a high-risk area</Text>
+                  <Text style={styles.notifBtnLabel}>
+                    Danger Zone Warning (immediate)
+                  </Text>
+                  <Text style={styles.notifBtnDesc}>
+                    Simulates entering a high-risk area
+                  </Text>
                 </View>
               </TouchableOpacity>
 
               <TouchableOpacity
                 style={styles.notifButton}
                 onPress={async () => {
-                  await sendEmergencyContactAlert('Sarah (Emergency Contact)');
-                  notifySuccess('Emergency contact alert fired');
+                  await sendEmergencyContactAlert("Sarah (Emergency Contact)");
+                  notifySuccess("Emergency contact alert fired");
                 }}
               >
                 <Ionicons name="people" size={20} color="#3b82f6" />
                 <View style={styles.notifBtnText}>
-                  <Text style={styles.notifBtnLabel}>Emergency Contact Alert (immediate)</Text>
-                  <Text style={styles.notifBtnDesc}>Simulates your contact triggering an SOS</Text>
+                  <Text style={styles.notifBtnLabel}>
+                    Emergency Contact Alert (immediate)
+                  </Text>
+                  <Text style={styles.notifBtnDesc}>
+                    Simulates your contact triggering an SOS
+                  </Text>
                 </View>
               </TouchableOpacity>
 
@@ -249,26 +294,34 @@ export default function ProfileScreen() {
                 style={styles.notifButton}
                 onPress={async () => {
                   await sendSOSResolvedNotification();
-                  notifySuccess('SOS Resolved notification fired');
+                  notifySuccess("SOS Resolved notification fired");
                 }}
               >
                 <Ionicons name="checkmark-circle" size={20} color="#22c55e" />
                 <View style={styles.notifBtnText}>
-                  <Text style={styles.notifBtnLabel}>SOS Resolved (immediate)</Text>
-                  <Text style={styles.notifBtnDesc}>Simulates your SOS being marked resolved</Text>
+                  <Text style={styles.notifBtnLabel}>
+                    SOS Resolved (immediate)
+                  </Text>
+                  <Text style={styles.notifBtnDesc}>
+                    Simulates your SOS being marked resolved
+                  </Text>
                 </View>
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={[styles.notifButton, { borderColor: '#8b5cf6' }]}
+                style={[styles.notifButton, { borderColor: "#8b5cf6" }]}
                 onPress={async () => {
                   await sendCheckInReminder(10);
-                  notifyInfo('Check-In reminder fires in 10 seconds – background the app!');
+                  notifyInfo(
+                    "Check-In reminder fires in 10 seconds – background the app!",
+                  );
                 }}
               >
                 <Ionicons name="timer" size={20} color="#8b5cf6" />
                 <View style={styles.notifBtnText}>
-                  <Text style={styles.notifBtnLabel}>Check-In Reminder (10s delay)</Text>
+                  <Text style={styles.notifBtnLabel}>
+                    Check-In Reminder (10s delay)
+                  </Text>
                   <Text style={styles.notifBtnDesc}>
                     Scheduled for 10 s – background the app to see it arrive
                   </Text>
@@ -281,21 +334,35 @@ export default function ProfileScreen() {
                   style={styles.notifSmallBtn}
                   onPress={async () => {
                     await cancelAllNotifications();
-                    Toast.show({ type: 'info', text1: 'Cancelled', text2: 'All pending notifications cancelled' });
+                    Toast.show({
+                      type: "info",
+                      text1: "Cancelled",
+                      text2: "All pending notifications cancelled",
+                    });
                   }}
                 >
                   <Ionicons name="ban" size={16} color="#94a3b8" />
-                  <Text style={styles.notifSmallBtnText}>Cancel All Scheduled</Text>
+                  <Text style={styles.notifSmallBtnText}>
+                    Cancel All Scheduled
+                  </Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
                   style={styles.notifSmallBtn}
                   onPress={async () => {
                     await clearBadge();
-                    Toast.show({ type: 'info', text1: 'Badge Cleared', text2: 'App icon badge reset to 0' });
+                    Toast.show({
+                      type: "info",
+                      text1: "Badge Cleared",
+                      text2: "App icon badge reset to 0",
+                    });
                   }}
                 >
-                  <Ionicons name="notifications-off" size={16} color="#94a3b8" />
+                  <Ionicons
+                    name="notifications-off"
+                    size={16}
+                    color="#94a3b8"
+                  />
                   <Text style={styles.notifSmallBtnText}>Clear Badge</Text>
                 </TouchableOpacity>
               </View>
@@ -305,18 +372,25 @@ export default function ProfileScreen() {
               <Text style={styles.sectionTitle}>Actions</Text>
 
               <TouchableOpacity style={styles.actionButton}>
-                <Ionicons name="settings" size={20} color="#fff" />
+                <Ionicons name="settings" size={20} color={AppColors.foreground} />
                 <Text style={styles.actionButtonText}>Privacy & Security</Text>
               </TouchableOpacity>
 
               <TouchableOpacity style={styles.actionButton}>
-                <Ionicons name="help-circle" size={20} color="#fff" />
+                <Ionicons name="help-circle" size={20} color={AppColors.foreground} />
                 <Text style={styles.actionButtonText}>Help & Support</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity style={[styles.actionButton, styles.logoutButton]} onPress={handleLogout}>
-                <Ionicons name="log-out" size={20} color="#ef4444" />
-                <Text style={[styles.actionButtonText, styles.logoutButtonText]}>Logout</Text>
+              <TouchableOpacity
+                style={[styles.actionButton, styles.logoutButton]}
+                onPress={handleLogout}
+              >
+                <Ionicons name="log-out" size={20} color={AppColors.themeColor} />
+                <Text
+                  style={[styles.actionButtonText, styles.logoutButtonText]}
+                >
+                  Logout
+                </Text>
               </TouchableOpacity>
             </View>
           </>
@@ -329,83 +403,83 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0f172a',
+    backgroundColor: AppColors.background,
   },
   header: {
     paddingTop: 60,
     paddingHorizontal: 20,
     paddingBottom: 20,
-    backgroundColor: '#1e293b',
+    backgroundColor: AppColors.background,
     borderBottomWidth: 1,
-    borderBottomColor: '#334155',
+    borderBottomColor: AppColors.border,
   },
   headerTitle: {
     fontSize: 28,
-    fontWeight: 'bold',
-    color: '#fff',
+    fontWeight: "bold",
+    color: AppColors.foreground,
   },
   content: {
     flex: 1,
     padding: 20,
   },
   profileCard: {
-    backgroundColor: '#1e293b',
+    backgroundColor: AppColors.background,
     borderRadius: 16,
     padding: 24,
-    alignItems: 'center',
+    alignItems: "center",
     marginBottom: 20,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: AppColors.border,
   },
   avatar: {
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: '#ef4444',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: AppColors.themeColor,
+    justifyContent: "center",
+    alignItems: "center",
     marginBottom: 16,
   },
   avatarText: {
     fontSize: 32,
-    fontWeight: 'bold',
-    color: '#fff',
+    fontWeight: "bold",
+    color: AppColors.foreground,
   },
   userName: {
     fontSize: 24,
-    fontWeight: 'bold',
-    color: '#fff',
+    fontWeight: "bold",
+    color: AppColors.foreground,
     marginBottom: 4,
   },
   userEmail: {
     fontSize: 14,
-    color: '#94a3b8',
+    color: AppColors.foreground,
     marginBottom: 20,
   },
   riskScoreContainer: {
-    width: '100%',
-    alignItems: 'center',
+    width: "100%",
+    alignItems: "center",
   },
   riskScoreLabel: {
     fontSize: 12,
-    color: '#94a3b8',
+    color: AppColors.foreground,
     marginBottom: 8,
   },
   riskScoreValue: {
     fontSize: 28,
-    fontWeight: 'bold',
-    color: '#fff',
+    fontWeight: "bold",
+    color: AppColors.foreground,
     marginBottom: 12,
   },
   riskScoreBar: {
-    width: '100%',
+    width: "100%",
     height: 8,
-    backgroundColor: '#334155',
+    backgroundColor: AppColors.border,
     borderRadius: 4,
-    overflow: 'hidden',
+    overflow: "hidden",
   },
   riskScoreFill: {
-    height: '100%',
+    height: "100%",
     borderRadius: 4,
   },
   section: {
@@ -413,19 +487,19 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: '600',
-    color: '#fff',
+    fontWeight: "600",
+    color: AppColors.foreground,
     marginBottom: 16,
   },
   infoItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#1e293b',
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: AppColors.background,
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: AppColors.border,
   },
   infoText: {
     marginLeft: 16,
@@ -433,128 +507,129 @@ const styles = StyleSheet.create({
   },
   infoLabel: {
     fontSize: 12,
-    color: '#94a3b8',
+    color: AppColors.foreground,
     marginBottom: 4,
   },
   infoValue: {
     fontSize: 16,
-    color: '#fff',
+    color: AppColors.foreground,
   },
   contactItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#1e293b',
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: AppColors.background,
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: AppColors.border,
   },
   contactText: {
     fontSize: 16,
-    color: '#fff',
+    color: AppColors.foreground,
     marginLeft: 16,
   },
   actionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#1e293b',
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: AppColors.background,
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: AppColors.border,
   },
   actionButtonText: {
     fontSize: 16,
-    color: '#fff',
+    color: AppColors.foreground,
     marginLeft: 16,
   },
   logoutButton: {
-    backgroundColor: 'transparent',
-    borderColor: '#ef4444',
+    backgroundColor: "transparent",
+    borderColor: AppColors.themeColor,
   },
   logoutButtonText: {
-    color: '#ef4444',
+    color: AppColors.themeColor,
   },
 
   // ── Push Notification section ──────────────────────────────────────────────
   notifStatusCard: {
-    backgroundColor: '#1e293b',
+    backgroundColor: AppColors.background,
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: AppColors.border,
     gap: 10,
   },
   notifStatusRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 8,
   },
   notifStatusLabel: {
     fontSize: 13,
-    color: '#94a3b8',
+    color: AppColors.foreground,
     flex: 1,
   },
   notifStatusValue: {
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: "600",
+    color: AppColors.foreground,
   },
   notifTokenValue: {
     fontSize: 11,
-    color: '#cbd5e1',
+    color: AppColors.foreground,
     flex: 2,
   },
   notifLastTitle: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#fff',
+    fontWeight: "600",
+    color: AppColors.foreground,
     marginBottom: 2,
   },
   notifLastBody: {
     fontSize: 12,
-    color: '#94a3b8',
+    color: AppColors.foreground,
   },
   notifInfoCard: {
-    backgroundColor: '#0f2038',
+    backgroundColor: AppColors.background,
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#1d4ed8',
+    borderColor: AppColors.border,
   },
   notifInfoTitle: {
     fontSize: 13,
-    fontWeight: '700',
-    color: '#93c5fd',
+    fontWeight: "700",
+    color: AppColors.themeColor,
     marginBottom: 8,
-    textTransform: 'uppercase',
+    textTransform: "uppercase",
     letterSpacing: 0.5,
   },
   notifInfoText: {
     fontSize: 12,
-    color: '#93c5fd',
+    color: AppColors.themeColor,
     lineHeight: 20,
   },
   notifTestTitle: {
     fontSize: 13,
-    fontWeight: '600',
-    color: '#64748b',
-    textTransform: 'uppercase',
+    fontWeight: "600",
+    color: AppColors.foreground,
+    textTransform: "uppercase",
     letterSpacing: 0.5,
     marginBottom: 12,
   },
   notifButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#1e293b',
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: AppColors.background,
     borderRadius: 12,
     padding: 14,
     marginBottom: 10,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: AppColors.border,
     gap: 12,
   },
   notifBtnText: {
@@ -562,34 +637,34 @@ const styles = StyleSheet.create({
   },
   notifBtnLabel: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#fff',
+    fontWeight: "600",
+    color: AppColors.foreground,
     marginBottom: 2,
   },
   notifBtnDesc: {
     fontSize: 11,
-    color: '#64748b',
+    color: AppColors.foreground,
   },
   notifActionRow: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 10,
     marginTop: 4,
   },
   notifSmallBtn: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#1e293b',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: AppColors.background,
     borderRadius: 10,
     padding: 10,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: AppColors.border,
     gap: 6,
   },
   notifSmallBtnText: {
     fontSize: 11,
-    color: '#94a3b8',
-    textAlign: 'center',
+    color: AppColors.foreground,
+    textAlign: "center",
   },
 });

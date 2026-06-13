@@ -162,7 +162,7 @@ async function registerForPushNotificationsAsync(
       name: "Safetify Alerts",
       importance: Notifications.AndroidImportance.MAX,
       vibrationPattern: [0, 250, 250, 250],
-      lightColor: "#ef4444",
+      lightColor: "#f0912b",
       sound: "default",
     });
   }

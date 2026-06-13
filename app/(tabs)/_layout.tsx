@@ -1,21 +1,39 @@
 import SOSButton from '@/components/SOSButton';
+import { AppColors } from '@/constants/theme';
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 import React from 'react';
-import { View } from 'react-native';
+import { Platform, StyleSheet, View } from 'react-native';
+
+let BlurView: typeof import('expo-blur').BlurView | null = null;
+
+if (Platform.OS === 'ios') {
+  try {
+    BlurView = require('expo-blur').BlurView;
+  } catch {
+    BlurView = null;
+  }
+}
+
+function TabBarBackground() {
+  if (BlurView) {
+    return <BlurView intensity={80} tint="light" style={StyleSheet.absoluteFill} />;
+  }
+
+  return <View style={styles.fallbackTabBarBackground} />;
+}
 
 export default function TabLayout() {
   return (
     <View style={{ flex: 1, backgroundColor: 'transparent' }}>
       <Tabs
         screenOptions={{
-          tabBarActiveTintColor: '#ef4444',
-          tabBarInactiveTintColor: '#94a3b8',
+          tabBarActiveTintColor: AppColors.themeColor,
+          tabBarInactiveTintColor: '#8A8A8A',
           tabBarStyle: {
-            backgroundColor: '#1E293BEF',
-            borderTopWidth: 1,
-            borderTopColor: '#334155',
-            
+            backgroundColor: 'transparent',
+            borderTopWidth: 2,
+            borderTopColor: '#fff7ed',
             paddingBottom: 8,
             paddingHorizontal: 10,
             paddingTop: 8,
@@ -24,13 +42,14 @@ export default function TabLayout() {
             shadowOpacity: 0,
             margin: 5,
             borderRadius: 50,
+            overflow: 'hidden',
             position: 'absolute',
           },
-          tabBarBackground: () => null,
+          tabBarBackground: () => <TabBarBackground />,
           headerStyle: {
-            backgroundColor: '#1e293b',
+            backgroundColor: AppColors.themeColor,
           },
-          headerTintColor: '#fff',
+          headerTintColor: AppColors.foreground,
           headerShown: false,
         }}>
         <Tabs.Screen
@@ -74,3 +93,10 @@ export default function TabLayout() {
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  fallbackTabBarBackground: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#fff7edE6',
+  },
+});

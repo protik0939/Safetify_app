@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, ScrollView, StyleSheet } from 'react-native';
 import { useAppStore } from '../../store/useAppStore';
 import { format } from 'date-fns';
+import { AppColors } from '@/constants/theme';
 
 export default function HistoryScreen() {
   const { sosHistory } = useAppStore();
@@ -52,25 +53,25 @@ export default function HistoryScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0f172a',
+    backgroundColor: '#FFFFFF',
   },
   header: {
     paddingTop: 60,
     paddingHorizontal: 20,
     paddingBottom: 20,
-    backgroundColor: '#1e293b',
+    backgroundColor: AppColors.background,
     borderBottomWidth: 1,
-    borderBottomColor: '#334155',
+    borderBottomColor: AppColors.border,
   },
   headerTitle: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#fff',
+    color: AppColors.foreground,
     marginBottom: 4,
   },
   headerSubtitle: {
     fontSize: 14,
-    color: '#94a3b8',
+    color: AppColors.foreground,
   },
   content: {
     flex: 1,
@@ -105,7 +106,7 @@ const styles = StyleSheet.create({
   },
   statusBadge: {
     alignSelf: 'flex-start',
-    backgroundColor: '#ef4444',
+    backgroundColor: '#f0912b',
     paddingHorizontal: 12,
     paddingVertical: 4,
     borderRadius: 8,
