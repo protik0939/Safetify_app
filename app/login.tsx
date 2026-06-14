@@ -65,8 +65,8 @@ export default function LoginScreen() {
   };
 
   const fillDemoCredentials = () => {
-    setEmail("demo@safetify.com");
-    setPassword("D3m0P@55w0rd");
+    setEmail(process.env.EXPO_PUBLIC_DEMO_LOGIN_EMAIL);
+    setPassword(process.env.EXPO_PUBLIC_DEMO_LOGIN_PASSWORD);
 
     Toast.show({
       type: "success",
@@ -146,8 +146,8 @@ export default function LoginScreen() {
             </TouchableOpacity>
           </View>
 
-          <Text style={styles.demoText}>Email: demo@safetify.com</Text>
-          <Text style={styles.demoText}>Password: D3m0P@55w0rd</Text>
+          <Text style={styles.demoText}>Email: {process.env.EXPO_PUBLIC_DEMO_LOGIN_EMAIL}</Text>
+          <Text style={styles.demoText}>Password: {process.env.EXPO_PUBLIC_DEMO_LOGIN_PASSWORD}</Text>
         </View>
       </View>
     </KeyboardAvoidingView>

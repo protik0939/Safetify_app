@@ -1,7 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Platform } from "react-native";
 
-const PRIMARY_BASE_URL = "https://safetify-backend.vercel.app/api/v1";
+const PRIMARY_BASE_URL = `${process.env.EXPO_PUBLIC_BACKEND_URL}/api/v1`;
 
 // Current local API fallback (used only if the hosted API is unavailable).
 const FALLBACK_BASE_URL =
