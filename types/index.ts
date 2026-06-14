@@ -112,5 +112,6 @@ export interface IncidentDetail {
   deathToll: number;
   injuryCount: number;
   peopleHelped: number;
+  timing: string;
   stories: string[];
 }
