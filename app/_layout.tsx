@@ -2,12 +2,9 @@ import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { useAppStore } from "@/store/useAppStore";
 import Toast from "@/components/AppToast";
 import { Stack } from "expo-router";
-import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
 import "react-native-reanimated";
-
-void SplashScreen.preventAutoHideAsync().catch(() => {});
 
 export const unstable_settings = {
   initialRouteName: "index",
@@ -22,10 +19,6 @@ export default function RootLayout() {
   const { expoPushToken, notification, error } = usePushNotifications();
 
   const addNotification = useAppStore((s) => s.addNotification);
-
-  useEffect(() => {
-    void SplashScreen.hideAsync().catch(() => {});
-  }, []);
 
   // Mirror every incoming notification into our global Zustand store so any
   // screen can display the notification badge / list.
