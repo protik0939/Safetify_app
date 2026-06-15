@@ -1,3 +1,4 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { AppColors, lastSectionStyle } from "@/constants/theme";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
 import {
@@ -250,6 +251,7 @@ export default function ProfileScreen() {
   };
 
   const handleLogout = async () => {
+    await AsyncStorage.clear();
     await clearSessionToken();
     logout();
     Toast.show({
