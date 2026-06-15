@@ -10,18 +10,75 @@ import {
     sendSOSResolvedNotification,
 } from "@/utils/notifications";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
-import React from "react";
+import { useRouter, useFocusEffect } from "expo-router";
+import React, { useState, useCallback, useEffect } from "react";
 import {
     ScrollView,
     StyleSheet,
     Text,
     TouchableOpacity,
     View,
+    Modal,
+    TextInput,
+    ActivityIndicator,
+    Pressable,
+    Animated,
 } from "react-native";
+import { Image } from "expo-image";
 import Toast from "react-native-toast-message";
 import { useAppStore } from "../../store/useAppStore";
-import { clearSessionToken } from "../../utils/authApi";
+import { clearSessionToken, getUser, updateUser } from "../../utils/authApi";
+import { getCurrentLocation, getReverseGeocode } from "../../utils/location";
+import { uploadImageToImgbb } from "../../utils/imageUpload";
+import * as ImagePicker from 'expo-image-picker';
+
+const BLOOD_GROUPS = [
+  "A_POSITIVE", "A_NEGATIVE", "B_POSITIVE", "B_NEGATIVE",
+  "AB_POSITIVE", "AB_NEGATIVE", "O_POSITIVE", "O_NEGATIVE"
+];
+
+const GENDERS = ["Male", "Female", "Others"];
+
+const formatBloodGroup = (bg?: string) => {
+  if (!bg) return "Unknown";
+  return bg.replace("_POSITIVE", "+").replace("_NEGATIVE", "-");
+};
+
+const Skeleton = ({ width, height, style, borderRadius = 4 }: { width: number | string, height: number | string, style?: any, borderRadius?: number }) => {
+  const opacity = React.useRef(new Animated.Value(0.3)).current;
+
+  React.useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(opacity, {
+          toValue: 0.7,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+        Animated.timing(opacity, {
+          toValue: 0.3,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+  }, [opacity]);
+
+  return (
+    <Animated.View
+      style={[
+        {
+          width,
+          height,
+          backgroundColor: AppColors.border,
+          borderRadius,
+          opacity,
+        },
+        style,
+      ]}
+    />
+  );
+};
 
 // ─── Small helper to show a toast after triggering a test notification ────────
 function notifySuccess(label: string) {
@@ -33,11 +90,164 @@ function notifyInfo(label: string) {
 
 export default function ProfileScreen() {
   const router = useRouter();
-  const { user, logout } = useAppStore();
+  const { user, logout, setUser } = useAppStore();
 
   // Push notification state from our hook (token, permission, last notification)
   const { expoPushToken, permissionGranted, error, notification } =
     usePushNotifications();
+
+  const [isEditModalVisible, setIsEditModalVisible] = useState(false);
+  const [editName, setEditName] = useState("");
+  const [editPhone, setEditPhone] = useState("");
+  const [editAddress, setEditAddress] = useState("");
+  const [editBio, setEditBio] = useState("");
+  const [editBloodGroup, setEditBloodGroup] = useState("");
+  const [editGender, setEditGender] = useState("");
+  const [editImage, setEditImage] = useState<string | null>(null);
+  const [isBloodGroupOpen, setIsBloodGroupOpen] = useState(false);
+  const [isGenderOpen, setIsGenderOpen] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [isLocationUpdating, setIsLocationUpdating] = useState(false);
+  const [isLoadingProfile, setIsLoadingProfile] = useState(false);
+  const [locationName, setLocationName] = useState("");
+
+  useEffect(() => {
+    const fetchLocationName = async () => {
+      if (user?.location && typeof user.location === "string") {
+        const [latStr, lngStr] = user.location.split(",");
+        const lat = parseFloat(latStr);
+        const lng = parseFloat(lngStr);
+        if (!isNaN(lat) && !isNaN(lng)) {
+          const name = await getReverseGeocode(lat, lng);
+          if (name) {
+            setLocationName(name);
+          }
+        }
+      }
+    };
+    fetchLocationName();
+  }, [user?.location]);
+
+  useFocusEffect(
+    useCallback(() => {
+      let isActive = true;
+
+      const fetchAndUpdateProfile = async () => {
+        if (!user) return;
+        
+        setIsLoadingProfile(true);
+        try {
+          // 1. Fetch latest user info from backend first
+          const latestUserRes = await getUser(user.id);
+          let userData = user;
+          
+          if (isActive && latestUserRes) {
+            const rawUser = latestUserRes.user || latestUserRes.data || latestUserRes;
+            userData = { ...rawUser };
+            setUser(userData);
+          }
+
+          // 2. Get current geolocation
+          setIsLocationUpdating(true);
+          const location = await getCurrentLocation();
+          
+          if (location) {
+            const newLat = location.coords.latitude;
+            const newLng = location.coords.longitude;
+            
+            const backendLoc = userData?.location;
+            
+            let shouldUpdate = false;
+            const locationString = `${newLat},${newLng}`;
+            
+            if (!backendLoc || backendLoc !== locationString) {
+              shouldUpdate = true;
+            }
+
+            if (shouldUpdate) {
+              console.log("Location missing or changed, updating backend:", locationString);
+              const updatedUserRes = await updateUser(user.id, { 
+                location: locationString
+              });
+              
+              if (isActive && updatedUserRes) {
+                const rawUpdated = updatedUserRes.user || updatedUserRes.data || updatedUserRes;
+                const updatedData = { ...rawUpdated };
+                setUser(updatedData);
+              }
+            }
+          }
+        } catch (err) {
+          console.error("Error updating profile on visit:", err);
+        } finally {
+          if (isActive) {
+            setIsLocationUpdating(false);
+            setIsLoadingProfile(false);
+          }
+        }
+      };
+
+      fetchAndUpdateProfile();
+
+      return () => {
+        isActive = false;
+      };
+    }, [user?.id])
+  );
+
+  const handlePickImage = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 1,
+    });
+
+    if (!result.canceled && result.assets && result.assets.length > 0) {
+      setEditImage(result.assets[0].uri);
+    }
+  };
+
+  const handleUpdateProfile = async () => {
+    if (!user) return;
+    setIsUpdating(true);
+    try {
+      let imageUrl = user.image || null;
+      if (editImage && !editImage.startsWith("http")) {
+        const uploadedUrl = await uploadImageToImgbb(editImage);
+        if (uploadedUrl) {
+          imageUrl = uploadedUrl;
+        } else {
+          Toast.show({ type: "error", text1: "Failed to upload image" });
+          setIsUpdating(false);
+          return;
+        }
+      }
+
+      const payload: any = { 
+        name: editName, 
+        address: editAddress,
+        bio: editBio,
+        image: imageUrl
+      };
+      
+      if (editPhone) payload.contactNo = editPhone;
+      if (editBloodGroup) payload.bloodGroup = editBloodGroup;
+      if (editGender) payload.gender = editGender;
+
+      const updatedUserRes = await updateUser(user.id, payload);
+      const rawUpdated = updatedUserRes.user || updatedUserRes.data || updatedUserRes;
+      const userData = { ...rawUpdated };
+      setUser(userData);
+      setIsEditModalVisible(false);
+      Toast.show({ type: "success", text1: "Profile Updated" });
+    } catch (err) {
+      console.error(err);
+      Toast.show({ type: "error", text1: "Failed to update profile" });
+    } finally {
+      setIsUpdating(false);
+    }
+  };
 
   const handleLogout = async () => {
     await clearSessionToken();
@@ -61,26 +271,77 @@ export default function ProfileScreen() {
           <>
             <View style={styles.profileCard}>
               <View style={styles.avatar}>
-                <Text style={styles.avatarText}>
-                  {user.name.charAt(0).toUpperCase()}
-                </Text>
+                {isLoadingProfile && !user.image ? (
+                  <Skeleton width={80} height={80} borderRadius={40} />
+                ) : user.image ? (
+                  <Image source={{ uri: user.image }} style={styles.avatarImage} />
+                ) : (
+                  <Text style={styles.avatarText}>
+                    {user.name.charAt(0).toUpperCase()}
+                  </Text>
+                )}
               </View>
-              <Text style={styles.userName}>{user.name}</Text>
-              <Text style={styles.userEmail}>{user.email}</Text>
+              {isLoadingProfile && !user.name ? (
+                <Skeleton width={150} height={28} borderRadius={8} style={{ marginBottom: 4 }} />
+              ) : (
+                <Text style={styles.userName}>{user.name}</Text>
+              )}
+              {isLoadingProfile && !user.gender ? (
+                <Skeleton width={80} height={16} borderRadius={4} style={{ marginVertical: 4 }} />
+              ) : user.gender ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 4 }}>
+                  <Ionicons name={user.gender === 'Male' ? 'male' : user.gender === 'Female' ? 'female' : 'male-female'} size={14} color={user.gender === 'Male' ? "" : user.gender === 'Female' ? "#ff00eaff" : "#001affff"} />
+                  <Text style={{ fontSize: 14, color: user.gender === 'Male' ? "" : user.gender === 'Female' ? "#ff00eaff" : "#001affff", marginLeft: 2 }}>{user.gender}</Text>
+                </View>
+              ) : null}
+              {isLoadingProfile && !user.email ? (
+                <Skeleton width={200} height={16} borderRadius={4} style={{ marginBottom: 20 }} />
+              ) : (
+                <Text style={styles.userEmail}>{user.email}</Text>
+              )}
+              {isLoadingProfile && !user.bio ? (
+                <Skeleton width={250} height={40} borderRadius={4} style={{ marginTop: 8 }} />
+              ) : user.bio ? (
+                <Text style={styles.userBio}>{user.bio}</Text>
+              ) : null}
+
+              {isLoadingProfile && !user.name ? (
+                <Skeleton width={120} height={32} borderRadius={20} style={{ marginTop: 8, marginBottom: 16 }} />
+              ) : (
+                <TouchableOpacity 
+                  style={styles.editProfileBtn} 
+                  onPress={() => {
+                    setEditName(user.name);
+                    setEditPhone(user.contactNo || "");
+                    setEditAddress(user.address || "");
+                    setEditBio(user.bio || "");
+                    setEditBloodGroup(user.bloodGroup || "");
+                    setEditGender(user.gender || "");
+                    setEditImage(user.image || null);
+                    setIsEditModalVisible(true);
+                  }}
+                >
+                  <Text style={styles.editProfileBtnText}>Edit Profile</Text>
+                </TouchableOpacity>
+              )}
 
               <View style={styles.riskScoreContainer}>
                 <Text style={styles.riskScoreLabel}>Safety Score</Text>
-                <Text style={styles.riskScoreValue}>{user.riskScore}/100</Text>
+                {isLoadingProfile && !user.name ? (
+                  <Skeleton width={100} height={32} borderRadius={8} style={{ marginBottom: 12 }} />
+                ) : (
+                  <Text style={styles.riskScoreValue}>{user.riskScore || 0}/100</Text>
+                )}
                 <View style={styles.riskScoreBar}>
                   <View
                     style={[
                       styles.riskScoreFill,
                       {
-                        width: `${user.riskScore}%`,
+                        width: `${user.riskScore || 0}%`,
                         backgroundColor:
-                          user.riskScore > 70
+                          (user.riskScore || 0) > 70
                             ? "#22c55e"
-                            : user.riskScore > 40
+                            : (user.riskScore || 0) > 40
                               ? "#eab308"
                               : "#f0912b",
                       },
@@ -97,7 +358,35 @@ export default function ProfileScreen() {
                 <Ionicons name="call" size={20} color="#94a3b8" />
                 <View style={styles.infoText}>
                   <Text style={styles.infoLabel}>Phone</Text>
-                  <Text style={styles.infoValue}>{user.phone}</Text>
+                  {isLoadingProfile && !user.contactNo ? (
+                    <Skeleton width={120} height={16} borderRadius={4} style={{ marginTop: 4 }} />
+                  ) : (
+                    <Text style={styles.infoValue}>{user.contactNo}</Text>
+                  )}
+                </View>
+              </View>
+
+              <View style={styles.infoItem}>
+                <Ionicons name="water" size={20} color="#ef4444" />
+                <View style={styles.infoText}>
+                  <Text style={styles.infoLabel}>Blood Group</Text>
+                  {isLoadingProfile && !user.bloodGroup ? (
+                    <Skeleton width={80} height={16} borderRadius={4} style={{ marginTop: 4 }} />
+                  ) : (
+                    <Text style={styles.infoValue}>{formatBloodGroup(user.bloodGroup)}</Text>
+                  )}
+                </View>
+              </View>
+
+              <View style={styles.infoItem}>
+                <Ionicons name="home" size={20} color="#94a3b8" />
+                <View style={styles.infoText}>
+                  <Text style={styles.infoLabel}>Address</Text>
+                  {isLoadingProfile && !user.address ? (
+                    <Skeleton width={180} height={16} borderRadius={4} style={{ marginTop: 4 }} />
+                  ) : (
+                    <Text style={styles.infoValue}>{user.address || "Not provided"}</Text>
+                  )}
                 </View>
               </View>
 
@@ -105,10 +394,18 @@ export default function ProfileScreen() {
                 <Ionicons name="location" size={20} color="#94a3b8" />
                 <View style={styles.infoText}>
                   <Text style={styles.infoLabel}>Location</Text>
-                  <Text style={styles.infoValue}>
-                    {user.location.latitude.toFixed(4)},{" "}
-                    {user.location.longitude.toFixed(4)}
-                  </Text>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                    {isLoadingProfile && !user.location ? (
+                      <Skeleton width={200} height={32} borderRadius={4} style={{ marginTop: 4 }} />
+                    ) : (
+                      <Text style={styles.infoValue}>
+                        {user.location && typeof user.location === 'string' ? 
+                          `${user.location.split(',').map(n => parseFloat(n).toFixed(4)).join(', ')}\n${locationName ? `${locationName}` : ''}` 
+                          : "Unknown"}
+                      </Text>
+                    )}
+                    {isLocationUpdating && !isLoadingProfile && <ActivityIndicator size="small" color={AppColors.themeColor} />}
+                  </View>
                 </View>
               </View>
 
@@ -116,21 +413,38 @@ export default function ProfileScreen() {
                 <Ionicons name="calendar" size={20} color="#94a3b8" />
                 <View style={styles.infoText}>
                   <Text style={styles.infoLabel}>Member Since</Text>
-                  <Text style={styles.infoValue}>
-                    {new Date(user.createdAt).toLocaleDateString()}
-                  </Text>
+                  {isLoadingProfile && !user.createdAt ? (
+                    <Skeleton width={100} height={16} borderRadius={4} style={{ marginTop: 4 }} />
+                  ) : (
+                    <Text style={styles.infoValue}>
+                      {new Date(user.createdAt).toLocaleDateString()}
+                    </Text>
+                  )}
                 </View>
               </View>
             </View>
 
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Emergency Contacts</Text>
-              {user.emergencyContacts.map((contact, index) => (
-                <View key={index} style={styles.contactItem}>
-                  <Ionicons name="people" size={20} color="#94a3b8" />
-                  <Text style={styles.contactText}>{contact}</Text>
-                </View>
-              ))}
+              {isLoadingProfile && (!user.emergencyContacts || user.emergencyContacts.length === 0) ? (
+                <>
+                  <View style={styles.contactItem}>
+                    <Ionicons name="people" size={20} color="#94a3b8" />
+                    <Skeleton width={150} height={16} borderRadius={4} style={{ marginLeft: 16 }} />
+                  </View>
+                  <View style={styles.contactItem}>
+                    <Ionicons name="people" size={20} color="#94a3b8" />
+                    <Skeleton width={150} height={16} borderRadius={4} style={{ marginLeft: 16 }} />
+                  </View>
+                </>
+              ) : (
+                (user.emergencyContacts || []).map((contact, index) => (
+                  <View key={index} style={styles.contactItem}>
+                    <Ionicons name="people" size={20} color="#94a3b8" />
+                    <Text style={styles.contactText}>{contact}</Text>
+                  </View>
+                ))
+              )}
             </View>
 
             {/* ═══════════════════════════════════════════════════════════
@@ -396,6 +710,174 @@ export default function ProfileScreen() {
           </>
         )}
       </ScrollView>
+
+      {/* Edit Profile Modal */}
+      <Modal
+        visible={isEditModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setIsEditModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <ScrollView contentContainerStyle={{ padding: 20, justifyContent: 'center', flexGrow: 1 }}>
+            <View style={styles.modalContent}>
+              <Text style={styles.modalTitle}>Edit Profile</Text>
+
+              <View style={{ alignItems: 'center', marginBottom: 20 }}>
+                <TouchableOpacity style={styles.editAvatarContainer} onPress={handlePickImage}>
+                  {editImage ? (
+                    <Image source={{ uri: editImage }} style={styles.editAvatarImage} />
+                  ) : (
+                    <View style={styles.editAvatarPlaceholder}>
+                      <Ionicons name="camera" size={30} color="#94a3b8" />
+                    </View>
+                  )}
+                </TouchableOpacity>
+                <Text style={{ color: '#94a3b8', fontSize: 12, marginTop: 8 }}>Tap to change picture</Text>
+              </View>
+              
+              <Text style={styles.inputLabel}>Name</Text>
+              <TextInput
+                style={styles.input}
+                value={editName}
+                onChangeText={setEditName}
+                placeholder="Enter your name"
+                placeholderTextColor="#94a3b8"
+              />
+
+              <Text style={styles.inputLabel}>Phone Number</Text>
+              <TextInput
+                style={styles.input}
+                value={editPhone}
+                onChangeText={setEditPhone}
+                placeholder="Enter your phone number"
+                placeholderTextColor="#94a3b8"
+                keyboardType="phone-pad"
+              />
+
+              <Text style={styles.inputLabel}>Blood Group</Text>
+              <TouchableOpacity
+                style={styles.input}
+                onPress={() => setIsBloodGroupOpen(true)}
+              >
+                <Text style={{ color: editBloodGroup ? AppColors.foreground : "#94a3b8" }}>
+                  {editBloodGroup ? formatBloodGroup(editBloodGroup) : "Select blood group"}
+                </Text>
+                <Ionicons name="chevron-down" size={20} color="#94a3b8" style={{ position: 'absolute', right: 12, top: 12 }} />
+              </TouchableOpacity>
+
+              <Text style={styles.inputLabel}>Gender</Text>
+              <TouchableOpacity
+                style={styles.input}
+                onPress={() => setIsGenderOpen(true)}
+              >
+                <Text style={{ color: editGender ? AppColors.foreground : "#94a3b8" }}>
+                  {editGender ? editGender : "Select gender"}
+                </Text>
+                <Ionicons name="chevron-down" size={20} color="#94a3b8" style={{ position: 'absolute', right: 12, top: 12 }} />
+              </TouchableOpacity>
+
+              <Text style={styles.inputLabel}>Address</Text>
+              <TextInput
+                style={styles.input}
+                value={editAddress}
+                onChangeText={setEditAddress}
+                placeholder="Enter your address"
+                placeholderTextColor="#94a3b8"
+              />
+
+              <Text style={styles.inputLabel}>Bio</Text>
+              <TextInput
+                style={[styles.input, { minHeight: 80, textAlignVertical: 'top' }]}
+                value={editBio}
+                onChangeText={setEditBio}
+                placeholder="Tell us about yourself"
+                placeholderTextColor="#94a3b8"
+                multiline
+                numberOfLines={3}
+              />
+
+              <View style={styles.modalActions}>
+                <TouchableOpacity
+                  style={[styles.modalBtn, styles.modalCancelBtn]}
+                  onPress={() => setIsEditModalVisible(false)}
+                  disabled={isUpdating}
+                >
+                  <Text style={styles.modalCancelBtnText}>Cancel</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity
+                  style={[styles.modalBtn, styles.modalSaveBtn]}
+                  onPress={handleUpdateProfile}
+                  disabled={isUpdating}
+                >
+                  {isUpdating ? (
+                    <ActivityIndicator color="#fff" size="small" />
+                  ) : (
+                    <Text style={styles.modalSaveBtnText}>Save</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          </ScrollView>
+        </View>
+      </Modal>
+
+      <Modal visible={isBloodGroupOpen} transparent animationType="fade">
+        <Pressable
+          style={styles.backdrop}
+          onPress={() => setIsBloodGroupOpen(false)}
+        />
+        <View style={styles.bloodGroupModalBox}>
+          <Text style={styles.bloodGroupModalTitle}>Select Blood Group</Text>
+          {BLOOD_GROUPS.map((item) => (
+            <TouchableOpacity
+              key={item}
+              style={styles.bloodGroupOption}
+              onPress={() => {
+                setEditBloodGroup(item);
+                setIsBloodGroupOpen(false);
+              }}
+            >
+              <Text style={[styles.bloodGroupOptionText, { color: editBloodGroup === item ? AppColors.themeColor : AppColors.foreground }]}>
+                {editBloodGroup === item && (
+                  <Ionicons name="checkmark" size={15} color={AppColors.themeColor} />
+                )}
+                {editBloodGroup === item ? ' ' : ''}
+                {formatBloodGroup(item)}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </Modal>
+
+      <Modal visible={isGenderOpen} transparent animationType="fade">
+        <Pressable
+          style={styles.backdrop}
+          onPress={() => setIsGenderOpen(false)}
+        />
+        <View style={styles.bloodGroupModalBox}>
+          <Text style={styles.bloodGroupModalTitle}>Select Gender</Text>
+          {GENDERS.map((item) => (
+            <TouchableOpacity
+              key={item}
+              style={styles.bloodGroupOption}
+              onPress={() => {
+                setEditGender(item);
+                setIsGenderOpen(false);
+              }}
+            >
+              <Text style={[styles.bloodGroupOptionText, { color: editGender === item ? AppColors.themeColor : AppColors.foreground }]}>
+                {editGender === item && (
+                  <Ionicons name="checkmark" size={15} color={AppColors.themeColor} />
+                )}
+                {editGender === item ? ' ' : ''}
+                {item}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -551,6 +1033,82 @@ const styles = StyleSheet.create({
   logoutButtonText: {
     color: AppColors.themeColor,
   },
+  editProfileBtn: {
+    marginTop: 8,
+    marginBottom: 16,
+    paddingVertical: 6,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    backgroundColor: AppColors.themeColor,
+  },
+  editProfileBtnText: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalContent: {
+    width: "100%",
+    backgroundColor: AppColors.background,
+    borderRadius: 16,
+    padding: 24,
+    borderWidth: 1,
+    borderColor: AppColors.border,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: AppColors.foreground,
+    marginBottom: 20,
+  },
+  inputLabel: {
+    fontSize: 14,
+    color: AppColors.foreground,
+    marginBottom: 8,
+  },
+  input: {
+    backgroundColor: AppColors.background,
+    borderWidth: 1,
+    borderColor: AppColors.border,
+    borderRadius: 8,
+    padding: 12,
+    color: AppColors.foreground,
+    marginBottom: 16,
+  },
+  modalActions: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    marginTop: 12,
+    gap: 12,
+  },
+  modalBtn: {
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    minWidth: 80,
+    alignItems: "center",
+  },
+  modalCancelBtn: {
+    backgroundColor: "transparent",
+    borderWidth: 1,
+    borderColor: AppColors.border,
+  },
+  modalCancelBtnText: {
+    color: AppColors.foreground,
+    fontWeight: "600",
+  },
+  modalSaveBtn: {
+    backgroundColor: AppColors.themeColor,
+  },
+  modalSaveBtnText: {
+    color: "#ffffff",
+    fontWeight: "600",
+  },
 
   // ── Push Notification section ──────────────────────────────────────────────
   notifStatusCard: {
@@ -666,5 +1224,71 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: AppColors.foreground,
     textAlign: "center",
+  },
+  editAvatarContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    overflow: 'hidden',
+    backgroundColor: '#334155',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: AppColors.themeColor,
+  },
+  editAvatarImage: {
+    width: '100%',
+    height: '100%',
+  },
+  editAvatarPlaceholder: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  backdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+  },
+  bloodGroupModalBox: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: AppColors.background,
+    padding: 20,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    borderTopWidth: 1,
+    borderTopColor: AppColors.border,
+  },
+  bloodGroupModalTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: AppColors.foreground,
+    marginBottom: 15,
+  },
+  bloodGroupOption: {
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: AppColors.border,
+  },
+  bloodGroupOptionText: {
+    fontSize: 16,
+    color: AppColors.foreground,
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 50,
+    borderColor: AppColors.themeColor,
+    borderWidth: 2,
+  },
+  userBio: {
+    fontSize: 14,
+    color: '#94a3b8',
+    marginTop: 8,
+    textAlign: 'center',
+    paddingHorizontal: 20,
   },
 });

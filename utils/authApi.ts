@@ -43,6 +43,7 @@ export async function authHeaders(): Promise<Record<string, string>> {
 export interface RegisterPayload {
   name: string;
   email: string;
+  contactNo: string;
   password: string;
 }
 
@@ -58,6 +59,10 @@ export interface AuthUser {
   email: string;
   emailVerified: boolean;
   image: string | null;
+  address: string;
+  contactNo: string;
+  bloodGroup: string;
+  bio: string;
   createdAt: string;
   updatedAt: string;
   role: string;
@@ -167,4 +172,29 @@ export async function loginUser(payload: LoginPayload): Promise<AuthResponse> {
 
   if (data.token) await saveSessionToken(data.token);
   return data;
+}
+
+export async function getUser(userId: string): Promise<any> {
+  try {
+    const headers = await authHeaders();
+    const res = await fetchWithBaseUrlFallback(`/user/${userId}`, {
+      method: "GET",
+      headers,
+    });
+    return handleResponse<any>(res);
+  } catch (e) {
+    console.error("Error fetching user:", e);
+    return null;
+  }
+}
+
+export async function updateUser(userId: string, payload: any): Promise<any> {
+  const headers = await authHeaders();
+  // Using PUT as PATCH might not be supported and returning 404.
+  const res = await fetchWithBaseUrlFallback(`/user/${userId}`, {
+    method: "PUT",
+    headers,
+    body: JSON.stringify(payload),
+  });
+  return handleResponse<any>(res);
 }

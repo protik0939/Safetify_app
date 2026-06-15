@@ -192,7 +192,7 @@ export default function DashboardScreen() {
     return (
       <View style={styles.permissionContainer}>
         <View style={styles.permissionCard}>
-          <Text style={styles.permissionIcon}><Ionicons name='location' color={'white'} size={40} /></Text>
+          <Text style={styles.permissionIcon}><Ionicons name='location' color={AppColors.themeColor} size={40} /></Text>
           <Text style={styles.permissionTitle}>Location Access Required</Text>
           <Text style={styles.permissionText}>
             Safetify needs your location to provide safety alerts and show nearby danger zones.
@@ -325,7 +325,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   permissionButtonText: {
-    color: AppColors.foreground,
+    color: "#ffffff",
     fontSize: 16,
     fontWeight: '600',
   },

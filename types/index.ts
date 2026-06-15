@@ -2,11 +2,18 @@ export interface User {
   id: string;
   email: string;
   name: string;
-  phone: string;
-  location: Location;
+  contactNo: string;
+  bio: string;
+  role: string;
+  accountStatus: string;
+  emailVerified: boolean;
+  address: string;
+  bloodGroup: string;
+  location: string;
   createdAt: Date;
   emergencyContacts: string[];
-  avatar?: string;
+  image?: string | null;
+  gender?: string;
   riskScore: number;
 }
 

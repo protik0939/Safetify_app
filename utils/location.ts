@@ -84,3 +84,20 @@ export const checkIfInDangerZone = (
   const distance = getDistance(userLat, userLon, dangerLat, dangerLon);
   return distance <= radius;
 };
+
+export const getReverseGeocode = async (latitude: number, longitude: number): Promise<string | null> => {
+  try {
+    const geocode = await Location.reverseGeocodeAsync({ latitude, longitude });
+    if (geocode && geocode.length > 0) {
+      const place = geocode[0];
+      const parts = [];
+      if (place.city || place.subregion || place.district) parts.push(place.city || place.subregion || place.district);
+      if (place.region) parts.push(place.region);
+      if (place.country) parts.push(place.country);
+      return parts.length > 0 ? parts.join(", ") : null;
+    }
+  } catch (error) {
+    console.error("Error reverse geocoding:", error);
+  }
+  return null;
+};
