@@ -6,7 +6,7 @@ const PRIMARY_BASE_URL = `${process.env.EXPO_PUBLIC_BACKEND_URL}/api/v1`;
 // Current local API fallback (used only if the hosted API is unavailable).
 const FALLBACK_BASE_URL =
   Platform.OS === "android"
-    ? "http://192.168.110.189:5000/api/v1"
+    ? "http://192.168.0.103:5000/api/v1"
     : "http://localhost:5000/api/v1";
 
 export const BASE_URL = PRIMARY_BASE_URL;
@@ -90,7 +90,7 @@ async function handleResponse<T>(res: Response): Promise<T> {
   return data as T;
 }
 
-async function fetchWithBaseUrlFallback(
+export async function fetchWithBaseUrlFallback(
   path: string,
   init: RequestInit,
 ): Promise<Response> {

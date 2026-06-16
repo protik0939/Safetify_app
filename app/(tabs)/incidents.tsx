@@ -3,6 +3,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { format } from "date-fns";
 import React, { useEffect, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   Modal,
   Pressable,
@@ -15,13 +16,21 @@ import {
 } from "react-native";
 import { WebView } from "react-native-webview";
 import type { IncidentDetail } from "../../types";
-import { generateMockIncidentDetails } from "../../utils/mockData";
+import {
+  createIncident,
+  getAllIncidents,
+  type IncidentRecord,
+} from "../../utils/incidentApi";
+import { useAppStore } from "../../store/useAppStore";
 
 export default function IncidentsScreen() {
+  const user = useAppStore((s) => s.user);
   const [incidents, setIncidents] = useState<IncidentDetail[]>([]);
   const [selectedIncident, setSelectedIncident] =
     useState<IncidentDetail | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [newIncident, setNewIncident] = useState({
     title: "",
     description: "",
@@ -42,8 +51,41 @@ export default function IncidentsScreen() {
   const [timingOpen, setTimingOpen] = useState(false);
 
   useEffect(() => {
-    setIncidents(generateMockIncidentDetails());
+    loadIncidents();
   }, []);
+
+  const mapRecordToDetail = (record: IncidentRecord): IncidentDetail => ({
+    id: record.id,
+    location: {
+      latitude: record.latitude,
+      longitude: record.longitude,
+      timestamp: new Date(record.createdAt),
+    },
+    title: record.title ?? "Untitled Incident",
+    description: record.description ?? "",
+    date: new Date(record.reportedAt),
+    severity: record.severityLevel ?? "medium",
+    victim: record.victim ?? "Unknown",
+    attackers: record.attackers ?? "N/A",
+    deathToll: record.deathToll ?? 0,
+    injuryCount: record.injuryCount ?? 0,
+    peopleHelped: record.peopleHelped ?? 0,
+    timing: record.timing ?? "Unknown",
+    stories: record.stories ?? [],
+  });
+
+  const loadIncidents = async () => {
+    setIsLoading(true);
+    try {
+      const records = await getAllIncidents();
+      setIncidents(records.map(mapRecordToDetail));
+    } catch (error: any) {
+      console.error("Failed to load incidents:", error);
+      Alert.alert("Error", "Failed to load incidents. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const getSeverityColor = (severity: string) => {
     switch (severity) {
@@ -163,7 +205,7 @@ export default function IncidentsScreen() {
     setShowAddForm(false);
   };
 
-  const handleSaveIncident = () => {
+  const handleSaveIncident = async () => {
     if (!newIncident.title.trim() || !newIncident.description.trim()) {
       Alert.alert(
         "Missing fields",
@@ -172,29 +214,40 @@ export default function IncidentsScreen() {
       return;
     }
 
-    const createdIncident: IncidentDetail = {
-      id: `user-${Date.now()}`,
-      location: {
+    if (!user?.id) {
+      Alert.alert("Error", "You must be logged in to report an incident.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const payload = {
+        userId: user.id,
+        title: newIncident.title.trim(),
+        description: newIncident.description.trim(),
         latitude: parseFloat(newIncident.latitude) || 0,
         longitude: parseFloat(newIncident.longitude) || 0,
-        timestamp: new Date(),
-      },
-      title: newIncident.title.trim(),
-      description: newIncident.description.trim(),
-      date: new Date(),
-      severity: newIncident.severity.trim().toLowerCase() || "medium",
-      victim: newIncident.victim.trim() || "Unknown",
-      attackers: newIncident.attackers.trim() || "N/A",
-      deathToll: Number.parseInt(newIncident.deathToll, 10) || 0,
-      injuryCount: Number.parseInt(newIncident.injuryCount, 10) || 0,
-      peopleHelped: Number.parseInt(newIncident.peopleHelped, 10) || 0,
-      timing: newIncident.timing || "Unknown",
-      stories: [],
-    };
+        severityLevel: newIncident.severity.trim().toLowerCase() || "medium",
+        timing: newIncident.timing || "Unknown",
+        victim: newIncident.victim.trim() || "Unknown",
+        attackers: newIncident.attackers.trim() || "N/A",
+        deathToll: Number.parseInt(newIncident.deathToll, 10) || 0,
+        injuryCount: Number.parseInt(newIncident.injuryCount, 10) || 0,
+        peopleHelped: Number.parseInt(newIncident.peopleHelped, 10) || 0,
+        stories: [],
+      };
 
-    setIncidents((previous) => [createdIncident, ...previous]);
-    resetForm();
-    setShowAddForm(false);
+      const created = await createIncident(payload);
+      setIncidents((previous) => [mapRecordToDetail(created), ...previous]);
+      resetForm();
+      setShowAddForm(false);
+      Alert.alert("Success", "Incident reported successfully.");
+    } catch (error: any) {
+      console.error("Failed to create incident:", error);
+      Alert.alert("Error", error.message || "Failed to report incident. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   if (selectedIncident) {
@@ -581,14 +634,20 @@ export default function IncidentsScreen() {
 
               <View style={styles.formActions}>
                 <TouchableOpacity
-                  style={styles.saveButton}
+                  style={[styles.saveButton, isSubmitting && { opacity: 0.6 }]}
                   onPress={handleSaveIncident}
+                  disabled={isSubmitting}
                 >
-                  <Text style={styles.saveButtonText}>Save</Text>
+                  {isSubmitting ? (
+                    <ActivityIndicator color="#fff" size="small" />
+                  ) : (
+                    <Text style={styles.saveButtonText}>Save</Text>
+                  )}
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.cancelButton}
                   onPress={handleCancelAddIncident}
+                  disabled={isSubmitting}
                 >
                   <Text style={styles.cancelButtonText}>Cancel</Text>
                 </TouchableOpacity>
@@ -596,59 +655,68 @@ export default function IncidentsScreen() {
             </View>
           )}
 
-          {incidents.map((incident) => (
-            <TouchableOpacity
-              key={incident.id}
-              style={styles.incidentCard}
-              onPress={() => setSelectedIncident(incident)}
-            >
-              <View
-                style={[
-                  styles.severityBadge,
-                  { backgroundColor: getSeverityColor(incident.severity) },
-                ]}
+          {isLoading ? (
+            <View style={{ paddingVertical: 40, alignItems: "center" }}>
+              <ActivityIndicator color={AppColors.themeColor} size="large" />
+              <Text style={{ marginTop: 12, color: AppColors.foreground }}>
+                Loading incidents...
+              </Text>
+            </View>
+          ) : (
+            incidents.map((incident) => (
+              <TouchableOpacity
+                key={incident.id}
+                style={styles.incidentCard}
+                onPress={() => setSelectedIncident(incident)}
               >
-                <Text style={styles.severityText}>
-                  {incident.severity.toUpperCase()}
-                </Text>
-              </View>
+                <View
+                  style={[
+                    styles.severityBadge,
+                    { backgroundColor: getSeverityColor(incident.severity) },
+                  ]}
+                >
+                  <Text style={styles.severityText}>
+                    {incident.severity.toUpperCase()}
+                  </Text>
+                </View>
 
-              <Text style={styles.incidentTitle}>{incident.title}</Text>
-              <Text style={styles.incidentDate}>
-                {format(incident.date, "MMM dd, yyyy")}
-              </Text>
-              <Text style={styles.incidentDescription} numberOfLines={2}>
-                {incident.description}
-              </Text>
+                <Text style={styles.incidentTitle}>{incident.title}</Text>
+                <Text style={styles.incidentDate}>
+                  {format(incident.date, "MMM dd, yyyy")}
+                </Text>
+                <Text style={styles.incidentDescription} numberOfLines={2}>
+                  {incident.description}
+                </Text>
 
-              <View style={styles.incidentStats}>
-                <Text style={styles.incidentStat}>
-                  <Ionicons
-                    name="skull"
-                    size={15}
-                    color={AppColors.themeColor}
-                  />{" "}
-                  {incident.deathToll}
-                </Text>
-                <Text style={styles.incidentStat}>
-                  <Ionicons
-                    name="bandage"
-                    size={15}
-                    color={AppColors.themeColor}
-                  />{" "}
-                  {incident.injuryCount}
-                </Text>
-                <Text style={styles.incidentStat}>
-                  <Ionicons
-                    name="people"
-                    size={15}
-                    color={AppColors.themeColor}
-                  />{" "}
-                  {incident.peopleHelped}
-                </Text>
-              </View>
-            </TouchableOpacity>
-          ))}
+                <View style={styles.incidentStats}>
+                  <Text style={styles.incidentStat}>
+                    <Ionicons
+                      name="skull"
+                      size={15}
+                      color={AppColors.themeColor}
+                    />{" "}
+                    {incident.deathToll}
+                  </Text>
+                  <Text style={styles.incidentStat}>
+                    <Ionicons
+                      name="bandage"
+                      size={15}
+                      color={AppColors.themeColor}
+                    />{" "}
+                    {incident.injuryCount}
+                  </Text>
+                  <Text style={styles.incidentStat}>
+                    <Ionicons
+                      name="people"
+                      size={15}
+                      color={AppColors.themeColor}
+                    />{" "}
+                    {incident.peopleHelped}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            ))
+          )}
         </View>
       </ScrollView>
     </View>
