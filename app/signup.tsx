@@ -1,11 +1,13 @@
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import Toast from '@/components/AppToast';
 import SafetifyLogo from '../assets/images/safetifyLogo.svg';
 import { useAppStore } from '../store/useAppStore';
 import { registerUser } from '../utils/authApi';
+import { signInWithGoogle } from '../utils/googleAuth';
 import { AppColors } from '@/constants/theme';
+import { Ionicons } from '@expo/vector-icons';
 
 export default function SignupScreen() {
   const router = useRouter();
@@ -16,6 +18,7 @@ export default function SignupScreen() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
 
   const handleSignup = async () => {
     if (!name || !email || !password || !confirmPassword) {
@@ -65,6 +68,39 @@ export default function SignupScreen() {
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleGoogleSignup = async () => {
+    setIsGoogleLoading(true);
+    try {
+      const { user: apiUser, token } = await signInWithGoogle();
+      setSessionToken(token ?? null);
+      setUser({
+        id: apiUser.id,
+        name: apiUser.name,
+        email: apiUser.email,
+        phone: apiUser.contactNo ?? '',
+        location: { latitude: 0, longitude: 0, timestamp: new Date() },
+        createdAt: new Date(apiUser.createdAt),
+        emergencyContacts: [],
+        riskScore: 0,
+        avatar: apiUser.image ?? undefined,
+      });
+      Toast.show({
+        type: 'success',
+        text1: 'Success',
+        text2: 'Google sign-in successful!',
+      });
+      router.replace('/(tabs)');
+    } catch (err: any) {
+      Toast.show({
+        type: 'error',
+        text1: 'Google sign-in failed',
+        text2: err?.message ?? 'Something went wrong',
+      });
+    } finally {
+      setIsGoogleLoading(false);
     }
   };
 
@@ -151,6 +187,27 @@ export default function SignupScreen() {
                 {isLoading ? 'Creating Account...' : 'Sign Up'}
               </Text>
             </TouchableOpacity>
+
+            <View style={styles.divider}>
+              <View style={styles.dividerLine} />
+              <Text style={styles.dividerText}>or</Text>
+              <View style={styles.dividerLine} />
+            </View>
+
+            <TouchableOpacity
+              style={[styles.googleButton, isGoogleLoading && styles.buttonDisabled]}
+              onPress={handleGoogleSignup}
+              disabled={isGoogleLoading}
+            >
+              {isGoogleLoading ? (
+                <ActivityIndicator color="#fff" size="small" />
+              ) : (
+                <>
+                  <Ionicons name="logo-google" size={20} color="#fff" style={{ marginRight: 10 }} />
+                  <Text style={styles.googleButtonText}>Continue with Google</Text>
+                </>
+              )}
+            </TouchableOpacity>
           </View>
 
           <View style={styles.footer}>
@@ -233,6 +290,34 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     textAlign: 'center',
+  },
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 8,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: AppColors.border,
+  },
+  dividerText: {
+    color: AppColors.foreground,
+    fontSize: 14,
+    marginHorizontal: 12,
+  },
+  googleButton: {
+    backgroundColor: '#4285F4',
+    borderRadius: 12,
+    paddingVertical: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  googleButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
   footer: {
     marginTop: 24,

@@ -1,6 +1,7 @@
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
+  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
@@ -13,7 +14,9 @@ import Toast from "@/components/AppToast";
 import SafetifyLogo from "../assets/images/safetifyLogo.svg";
 import { useAppStore } from "../store/useAppStore";
 import { loginUser } from "../utils/authApi";
+import { signInWithGoogle } from "../utils/googleAuth";
 import { AppColors } from "@/constants/theme";
+import { Ionicons } from "@expo/vector-icons";
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -21,6 +24,7 @@ export default function LoginScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -61,6 +65,39 @@ export default function LoginScreen() {
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleGoogleLogin = async () => {
+    setIsGoogleLoading(true);
+    try {
+      const { user: apiUser, token } = await signInWithGoogle();
+      setSessionToken(token ?? null);
+      setUser({
+        id: apiUser.id,
+        name: apiUser.name,
+        email: apiUser.email,
+        phone: apiUser.contactNo ?? "",
+        location: { latitude: 0, longitude: 0, timestamp: new Date() },
+        createdAt: new Date(apiUser.createdAt),
+        emergencyContacts: [],
+        riskScore: 0,
+        avatar: apiUser.image ?? undefined,
+      });
+      Toast.show({
+        type: "success",
+        text1: "Success",
+        text2: "Google sign-in successful!",
+      });
+      router.replace("/(tabs)");
+    } catch (err: any) {
+      Toast.show({
+        type: "error",
+        text1: "Google sign-in failed",
+        text2: err?.message ?? "Something went wrong",
+      });
+    } finally {
+      setIsGoogleLoading(false);
     }
   };
 
@@ -122,6 +159,27 @@ export default function LoginScreen() {
             <Text style={styles.buttonText}>
               {isLoading ? "Logging in..." : "Login"}
             </Text>
+          </TouchableOpacity>
+
+          <View style={styles.divider}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerText}>or</Text>
+            <View style={styles.dividerLine} />
+          </View>
+
+          <TouchableOpacity
+            style={[styles.googleButton, isGoogleLoading && styles.buttonDisabled]}
+            onPress={handleGoogleLogin}
+            disabled={isGoogleLoading}
+          >
+            {isGoogleLoading ? (
+              <ActivityIndicator color="#fff" size="small" />
+            ) : (
+              <>
+                <Ionicons name="logo-google" size={20} color="#fff" style={{ marginRight: 10 }} />
+                <Text style={styles.googleButtonText}>Continue with Google</Text>
+              </>
+            )}
           </TouchableOpacity>
         </View>
 
@@ -216,6 +274,34 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
     textAlign: "center",
+  },
+  divider: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginVertical: 8,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: AppColors.border,
+  },
+  dividerText: {
+    color: AppColors.foreground,
+    fontSize: 14,
+    marginHorizontal: 12,
+  },
+  googleButton: {
+    backgroundColor: "#4285F4",
+    borderRadius: 12,
+    paddingVertical: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  googleButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "600",
   },
   footer: {
     marginTop: 24,
