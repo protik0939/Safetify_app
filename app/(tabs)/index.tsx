@@ -7,6 +7,7 @@ import SafetifyLogo from '../../assets/images/safetifyLogo.svg';
 import { useAppStore } from '../../store/useAppStore';
 import { getCurrentLocation, watchLocation } from '../../utils/location';
 import { generateMockDangerZones } from '../../utils/mockData';
+import { getAllIncidents, type IncidentRecord } from '../../utils/incidentApi';
 import { AppColors } from '@/constants/theme';
 
 const getSeverityColor = (severity: string) => {
@@ -22,7 +23,8 @@ const getSeverityColor = (severity: string) => {
 const buildLeafletHTML = (
   lat: number,
   lng: number,
-  zones: ReturnType<typeof generateMockDangerZones>
+  zones: ReturnType<typeof generateMockDangerZones>,
+  incidents: IncidentRecord[],
 ) => {
   const zonesJSON = JSON.stringify(
     zones.map((z) => ({
@@ -31,6 +33,16 @@ const buildLeafletHTML = (
       radius: z.radius * 1000,
       severity: z.severity,
       color: getSeverityColor(z.severity),
+    }))
+  );
+
+  const incidentsJSON = JSON.stringify(
+    incidents.map((inc) => ({
+      lat: inc.latitude,
+      lng: inc.longitude,
+      severity: inc.severityLevel || 'medium',
+      color: getSeverityColor(inc.severityLevel || 'medium'),
+      title: inc.title || 'Incident',
     }))
   );
 
@@ -86,6 +98,30 @@ const buildLeafletHTML = (
       L.marker([z.lat, z.lng], { icon: pinIcon }).addTo(map);
     });
 
+    // Incident heatmap markers
+    var incidents = ${incidentsJSON};
+    incidents.forEach(function(inc) {
+      // Heatmap circle for each incident
+      L.circle([inc.lat, inc.lng], {
+        radius: 300,
+        color: inc.color,
+        fillColor: inc.color,
+        fillOpacity: 0.25,
+        weight: 1,
+        opacity: 0.6,
+      }).addTo(map);
+
+      // Incident pin
+      var incIcon = L.divIcon({
+        html: '<div style="width:10px;height:10px;border-radius:50%;background:' + inc.color + ';border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,0.5);"></div>',
+        iconSize: [10, 10],
+        iconAnchor: [5, 5],
+        className: '',
+      });
+      var marker = L.marker([inc.lat, inc.lng], { icon: incIcon }).addTo(map);
+      marker.bindPopup('<b>' + inc.title + '</b><br>' + inc.severity.toUpperCase());
+    });
+
     // Receive location updates from React Native
     document.addEventListener('message', handleMsg);
     window.addEventListener('message', handleMsg);
@@ -111,6 +147,7 @@ export default function DashboardScreen() {
   const slideAnim = useRef(new Animated.Value(-500)).current;
   const webViewRef = useRef<WebView>(null);
   const [mapCenter, setMapCenter] = useState({ latitude: 23.7808, longitude: 90.4132 });
+  const [incidents, setIncidents] = useState<IncidentRecord[]>([]);
 
   const requestLocationPermission = async () => {
     setIsRequestingLocation(true);
@@ -166,9 +203,19 @@ export default function DashboardScreen() {
 
   useEffect(() => {
     requestLocationPermission();
+    fetchIncidents();
   }, []);
 
-  const leafletHTML = buildLeafletHTML(mapCenter.latitude, mapCenter.longitude, dangerZones);
+  const fetchIncidents = async () => {
+    try {
+      const data = await getAllIncidents();
+      setIncidents(data);
+    } catch (error) {
+      console.error('Failed to load incidents for map:', error);
+    }
+  };
+
+  const leafletHTML = buildLeafletHTML(mapCenter.latitude, mapCenter.longitude, dangerZones, incidents);
 
   const toggleMenu = () => {
     const toValue = menuVisible ? -500 : 0;
@@ -257,6 +304,15 @@ export default function DashboardScreen() {
               <Text style={styles.dangerZoneCount}>{zone.count} incidents</Text>
             </View>
           ))}
+          {incidents.length > 0 && (
+            <View style={styles.dangerZoneCard}>
+              <View style={[styles.severityBadge, { backgroundColor: AppColors.themeColor }]}>
+                <Text style={styles.severityText}>LIVE</Text>
+              </View>
+              <Text style={styles.dangerZoneType}>Reported Incidents</Text>
+              <Text style={styles.dangerZoneCount}>{incidents.length} total reports</Text>
+            </View>
+          )}
         </ScrollView>
       </Animated.View>
 
