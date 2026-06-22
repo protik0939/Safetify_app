@@ -17,6 +17,7 @@ import { loginUser } from "../utils/authApi";
 import { signInWithGoogle } from "../utils/googleAuth";
 import { AppColors } from "@/constants/theme";
 import { Ionicons } from "@expo/vector-icons";
+import { User } from "../types";
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -44,12 +45,18 @@ export default function LoginScreen() {
         id: apiUser.id,
         name: apiUser.name,
         email: apiUser.email,
-        phone: "",
-        location: { latitude: 0, longitude: 0, timestamp: new Date() },
+        contactNo: apiUser.contactNo ?? "",
+        bio: apiUser.bio ?? "",
+        role: apiUser.role ?? "user",
+        accountStatus: apiUser.accountStatus ?? "active",
+        emailVerified: apiUser.emailVerified ?? false,
+        address: apiUser.address ?? "",
+        bloodGroup: apiUser.bloodGroup ?? "",
+        location: "",
         createdAt: new Date(apiUser.createdAt),
         emergencyContacts: [],
         riskScore: 0,
-        avatar: apiUser.image ?? undefined,
+        image: apiUser.image ?? undefined,
       });
       Toast.show({
         type: "success",
@@ -77,12 +84,18 @@ export default function LoginScreen() {
         id: apiUser.id,
         name: apiUser.name,
         email: apiUser.email,
-        phone: apiUser.contactNo ?? "",
-        location: { latitude: 0, longitude: 0, timestamp: new Date() },
+        contactNo: apiUser.contactNo ?? "",
+        bio: apiUser.bio ?? "",
+        role: apiUser.role ?? "user",
+        accountStatus: apiUser.accountStatus ?? "active",
+        emailVerified: apiUser.emailVerified ?? false,
+        address: apiUser.address ?? "",
+        bloodGroup: apiUser.bloodGroup ?? "",
+        location: "",
         createdAt: new Date(apiUser.createdAt),
         emergencyContacts: [],
         riskScore: 0,
-        avatar: apiUser.image ?? undefined,
+        image: apiUser.image ?? undefined,
       });
       Toast.show({
         type: "success",
@@ -206,6 +219,7 @@ export default function LoginScreen() {
 
           <Text style={styles.demoText}>Email: {process.env.EXPO_PUBLIC_DEMO_LOGIN_EMAIL}</Text>
           <Text style={styles.demoText}>Password: {process.env.EXPO_PUBLIC_DEMO_LOGIN_PASSWORD}</Text>
+          <Text style={styles.demoText}>Backend: {process.env.EXPO_PUBLIC_BACKEND_URL}</Text>
         </View>
       </View>
     </KeyboardAvoidingView>

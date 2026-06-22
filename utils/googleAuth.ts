@@ -19,11 +19,13 @@ const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL!;
  */
 export async function signInWithGoogle(): Promise<AuthResponse> {
   // The deep-link the backend will redirect to after successful auth.
-  // better-auth appends the session token as a query parameter.
-  const callbackURL = "safetify://google-auth";
+  const callbackURL = "safetify://";
 
-  const authUrl = `${BACKEND_URL}/api/v1/auth/signin/social?provider=google&callbackURL=${encodeURIComponent(callbackURL)}`;
+  // Point WebBrowser directly to our backend GET endpoint which initiates the social login
+  // and sets the state cookie directly in the browser's context.
+  const authUrl = `${BACKEND_URL}/api/v1/auth/social-login?provider=google&callbackURL=${encodeURIComponent(callbackURL)}`;
 
+  // Open the Google OAuth consent screen
   const result = await WebBrowser.openAuthSessionAsync(authUrl, callbackURL);
 
   if (result.type !== "success") {
@@ -73,8 +75,14 @@ async function completeSignIn(token: string): Promise<AuthResponse> {
     },
   });
 
+  console.log("[googleAuth] completeSignIn: sessionRes status =", sessionRes.status);
+  const raw = await sessionRes.json().catch((e) => {
+    console.log("[googleAuth] failed to parse json:", e);
+    return {};
+  });
+  console.log("[googleAuth] completeSignIn: sessionRes body =", JSON.stringify(raw, null, 2));
+
   if (sessionRes.ok) {
-    const raw = await sessionRes.json().catch(() => ({}));
     // Response shape: { success, message, data: { session, user } }
     const data = (raw as any)?.data ?? raw;
     const user = data?.user;

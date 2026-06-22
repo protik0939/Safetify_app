@@ -6,7 +6,7 @@ const PRIMARY_BASE_URL = `${process.env.EXPO_PUBLIC_BACKEND_URL}/api/v1`;
 // Current local API fallback (used only if the hosted API is unavailable).
 const FALLBACK_BASE_URL =
   Platform.OS === "android"
-    ? "http://192.168.0.103:5000/api/v1"
+    ? "http://10.0.2.2:5000/api/v1"
     : "http://localhost:5000/api/v1";
 
 export const BASE_URL = PRIMARY_BASE_URL;
@@ -154,7 +154,7 @@ export async function loginUser(payload: LoginPayload): Promise<AuthResponse> {
   });
   const raw = await res.json().catch(() => ({}));
   // 🔍 DEBUG – remove once confirmed working
-  console.log("[loginUser] raw response:", JSON.stringify(raw, null, 2));
+  // console.log("[loginUser] raw response:", JSON.stringify(raw, null, 2));
 
   if (!res.ok) {
     const message = `Request failed (${res.status})`;

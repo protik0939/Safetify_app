@@ -41,18 +41,24 @@ export default function SignupScreen() {
 
     setIsLoading(true);
     try {
-      const { user: apiUser, token } = await registerUser({ name, email, password });
+      const { user: apiUser, token } = await registerUser({ name, email, password, contactNo: phone });
       setSessionToken(token ?? null);
       setUser({
         id: apiUser.id,
         name: apiUser.name,
         email: apiUser.email,
-        phone: phone ?? '',
-        location: { latitude: 0, longitude: 0, timestamp: new Date() },
+        contactNo: phone ?? '',
+        bio: apiUser.bio ?? '',
+        role: apiUser.role ?? 'user',
+        accountStatus: apiUser.accountStatus ?? 'active',
+        emailVerified: apiUser.emailVerified ?? false,
+        address: apiUser.address ?? '',
+        bloodGroup: apiUser.bloodGroup ?? '',
+        location: '',
         createdAt: new Date(apiUser.createdAt),
         emergencyContacts: [],
         riskScore: 0,
-        avatar: apiUser.image ?? undefined,
+        image: apiUser.image ?? undefined,
       });
       Toast.show({
         type: 'success',
@@ -80,12 +86,18 @@ export default function SignupScreen() {
         id: apiUser.id,
         name: apiUser.name,
         email: apiUser.email,
-        phone: apiUser.contactNo ?? '',
-        location: { latitude: 0, longitude: 0, timestamp: new Date() },
+        contactNo: apiUser.contactNo ?? '',
+        bio: apiUser.bio ?? '',
+        role: apiUser.role ?? 'user',
+        accountStatus: apiUser.accountStatus ?? 'active',
+        emailVerified: apiUser.emailVerified ?? false,
+        address: apiUser.address ?? '',
+        bloodGroup: apiUser.bloodGroup ?? '',
+        location: '',
         createdAt: new Date(apiUser.createdAt),
         emergencyContacts: [],
         riskScore: 0,
-        avatar: apiUser.image ?? undefined,
+        image: apiUser.image ?? undefined,
       });
       Toast.show({
         type: 'success',
