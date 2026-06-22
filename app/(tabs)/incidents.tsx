@@ -5,6 +5,7 @@ import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  BackHandler,
   Modal,
   Pressable,
   ScrollView,
@@ -19,6 +20,8 @@ import type { IncidentDetail } from "../../types";
 import {
   createIncident,
   getAllIncidents,
+  updateIncident,
+  deleteIncident,
   type IncidentRecord,
 } from "../../utils/incidentApi";
 import { useAppStore } from "../../store/useAppStore";
@@ -31,7 +34,33 @@ export default function IncidentsScreen() {
   const [showAddForm, setShowAddForm] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Filtering state
+  const [filter, setFilter] = useState<'all' | 'mine' | 'others'>('all');
+
+  // Pagination state
+  const [offset, setOffset] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const [isMoreLoading, setIsMoreLoading] = useState(false);
+
+  // Add form state
   const [newIncident, setNewIncident] = useState({
+    title: "",
+    description: "",
+    severity: "",
+    victim: "",
+    attackers: "",
+    deathToll: "0",
+    injuryCount: "0",
+    peopleHelped: "0",
+    latitude: "",
+    longitude: "",
+    timing: "",
+  });
+
+  // Edit form state
+  const [editingIncident, setEditingIncident] = useState<IncidentDetail | null>(null);
+  const [editForm, setEditForm] = useState({
     title: "",
     description: "",
     severity: "",
@@ -46,16 +75,46 @@ export default function IncidentsScreen() {
   });
 
   const mapWebViewRef = useRef<WebView>(null);
+  const editMapWebViewRef = useRef<WebView>(null);
 
   const [open, setOpen] = useState(false);
   const [timingOpen, setTimingOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editTimingOpen, setEditTimingOpen] = useState(false);
 
   useEffect(() => {
     loadIncidents();
   }, []);
 
+  // Back button interception for Android hardware back button
+  useEffect(() => {
+    const backAction = () => {
+      if (selectedIncident) {
+        setSelectedIncident(null);
+        return true; // Intercepted
+      }
+      if (showAddForm) {
+        setShowAddForm(false);
+        return true; // Intercepted
+      }
+      if (editingIncident) {
+        setEditingIncident(null);
+        return true; // Intercepted
+      }
+      return false; // Let normal navigation take place
+    };
+
+    const backHandler = BackHandler.addEventListener(
+      "hardwareBackPress",
+      backAction
+    );
+
+    return () => backHandler.remove();
+  }, [selectedIncident, showAddForm, editingIncident]);
+
   const mapRecordToDetail = (record: IncidentRecord): IncidentDetail => ({
     id: record.id,
+    userId: record.userId,
     location: {
       latitude: record.latitude,
       longitude: record.longitude,
@@ -77,13 +136,35 @@ export default function IncidentsScreen() {
   const loadIncidents = async () => {
     setIsLoading(true);
     try {
-      const records = await getAllIncidents();
-      setIncidents(records.map(mapRecordToDetail));
+      const records = await getAllIncidents(10, 0);
+      const mapped = records.map(mapRecordToDetail);
+      setIncidents(mapped);
+      setOffset(mapped.length);
+      setHasMore(records.length === 10);
     } catch (error: any) {
       console.error("Failed to load incidents:", error);
       Alert.alert("Error", "Failed to load incidents. Please try again.");
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const loadMoreIncidents = async () => {
+    if (isMoreLoading || !hasMore) return;
+    setIsMoreLoading(true);
+    try {
+      const records = await getAllIncidents(10, offset);
+      const mapped = records.map(mapRecordToDetail);
+      if (records.length < 10) {
+        setHasMore(false);
+      }
+      setIncidents((prev) => [...prev, ...mapped]);
+      setOffset((prevOffset) => prevOffset + mapped.length);
+    } catch (error: any) {
+      console.error("Failed to load more incidents:", error);
+      Alert.alert("Error", "Failed to load more incidents.");
+    } finally {
+      setIsMoreLoading(false);
     }
   };
 
@@ -239,6 +320,7 @@ export default function IncidentsScreen() {
 
       const created = await createIncident(payload);
       setIncidents((previous) => [mapRecordToDetail(created), ...previous]);
+      setOffset((prevOffset) => prevOffset + 1);
       resetForm();
       setShowAddForm(false);
       Alert.alert("Success", "Incident reported successfully.");
@@ -250,13 +332,135 @@ export default function IncidentsScreen() {
     }
   };
 
+  // Incident Filtering logic
+  const filteredIncidents = incidents.filter((inc) => {
+    if (filter === "mine") {
+      return inc.userId === user?.id;
+    }
+    if (filter === "others") {
+      return inc.userId !== user?.id;
+    }
+    return true;
+  });
+
+  // Edit / Update handlers
+  const startEditingIncident = (incident: IncidentDetail) => {
+    setEditingIncident(incident);
+    setEditForm({
+      title: incident.title,
+      description: incident.description,
+      severity: incident.severity,
+      victim: incident.victim,
+      attackers: incident.attackers,
+      deathToll: String(incident.deathToll),
+      injuryCount: String(incident.injuryCount),
+      peopleHelped: String(incident.peopleHelped),
+      latitude: String(incident.location.latitude),
+      longitude: String(incident.location.longitude),
+      timing: incident.timing,
+    });
+  };
+
+  const handleUpdateIncident = async () => {
+    if (!editingIncident) return;
+    if (!editForm.title.trim() || !editForm.description.trim()) {
+      Alert.alert(
+        "Missing fields",
+        "Please enter at least a title and description.",
+      );
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const payload = {
+        title: editForm.title.trim(),
+        description: editForm.description.trim(),
+        latitude: parseFloat(editForm.latitude) || 0,
+        longitude: parseFloat(editForm.longitude) || 0,
+        severityLevel: editForm.severity.trim().toLowerCase() || "medium",
+        timing: editForm.timing || "Unknown",
+        victim: editForm.victim.trim() || "Unknown",
+        attackers: editForm.attackers.trim() || "N/A",
+        deathToll: Number.parseInt(editForm.deathToll, 10) || 0,
+        injuryCount: Number.parseInt(editForm.injuryCount, 10) || 0,
+        peopleHelped: Number.parseInt(editForm.peopleHelped, 10) || 0,
+      };
+
+      const updated = await updateIncident(editingIncident.id, payload);
+      const mapped = mapRecordToDetail(updated);
+
+      setIncidents((prev) =>
+        prev.map((inc) => (inc.id === editingIncident.id ? mapped : inc))
+      );
+
+      if (selectedIncident?.id === editingIncident.id) {
+        setSelectedIncident(mapped);
+      }
+
+      setEditingIncident(null);
+      Alert.alert("Success", "Incident updated successfully.");
+    } catch (error: any) {
+      console.error("Failed to update incident:", error);
+      Alert.alert("Error", error.message || "Failed to update incident.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Delete handlers
+  const confirmDeleteIncident = (incidentId: string, shouldCloseDetail = false) => {
+    Alert.alert(
+      "Confirm Delete",
+      "Are you sure you want to permanently delete this incident report?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await deleteIncident(incidentId);
+              setIncidents((prev) => prev.filter((inc) => inc.id !== incidentId));
+              if (shouldCloseDetail) {
+                setSelectedIncident(null);
+              }
+              Alert.alert("Deleted", "Incident report has been deleted.");
+            } catch (error: any) {
+              console.error("Failed to delete incident:", error);
+              Alert.alert("Error", "Could not delete incident report.");
+            }
+          }
+        }
+      ]
+    );
+  };
+
   if (selectedIncident) {
     return (
       <View style={styles.container}>
-        <View style={styles.header}>
+        <View style={[styles.header, styles.detailHeader]}>
           <TouchableOpacity onPress={() => setSelectedIncident(null)}>
             <Text style={styles.backButton}>← Back</Text>
           </TouchableOpacity>
+          {selectedIncident.userId === user?.id && (
+            <View style={styles.detailActionRow}>
+              <TouchableOpacity
+                style={[styles.detailActionButton, styles.editDetailBtn]}
+                onPress={() => startEditingIncident(selectedIncident)}
+              >
+                <Ionicons name="pencil" size={14} color="#fff" />
+                <Text style={styles.detailActionButtonText}>Edit</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.detailActionButton, styles.deleteDetailBtn]}
+                onPress={() => confirmDeleteIncident(selectedIncident.id, true)}
+              >
+                <Ionicons name="trash" size={14} color="#fff" />
+                <Text style={styles.detailActionButtonText}>Delete</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
 
         <ScrollView style={styles.content}>
@@ -364,6 +568,34 @@ export default function IncidentsScreen() {
             </Text>
           </TouchableOpacity>
 
+          {/* Filtering Chips Container */}
+          <View style={styles.filterContainer}>
+            <TouchableOpacity
+              style={[styles.filterChip, filter === 'all' && styles.filterChipActive]}
+              onPress={() => setFilter('all')}
+            >
+              <Text style={[styles.filterChipText, filter === 'all' && styles.filterChipTextActive]}>
+                All
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.filterChip, filter === 'mine' && styles.filterChipActive]}
+              onPress={() => setFilter('mine')}
+            >
+              <Text style={[styles.filterChipText, filter === 'mine' && styles.filterChipTextActive]}>
+                Your Incidents
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.filterChip, filter === 'others' && styles.filterChipActive]}
+              onPress={() => setFilter('others')}
+            >
+              <Text style={[styles.filterChipText, filter === 'others' && styles.filterChipTextActive]}>
+                Other's Incidents
+              </Text>
+            </TouchableOpacity>
+          </View>
+
           {showAddForm && (
             <View style={styles.formCard}>
               <Text style={styles.formTitle}>New Incident</Text>
@@ -394,16 +626,13 @@ export default function IncidentsScreen() {
               />
 
               <View style={styles.severityRow}>
-                {/* Display field */}
                 <TextInput
                   style={[styles.input, { flex: 1, color: getSeverityColor(newIncident.severity) }]}
-                  value={newIncident.severity?.toLocaleUpperCase()}
+                  value={newIncident.severity?.toUpperCase()}
                   placeholder="Select severity"
                   placeholderTextColor="#94a3b8"
                   editable={false}
                 />
-
-                {/* Button */}
                 <TouchableOpacity
                   style={styles.severityButton}
                   onPress={() => setOpen(true)}
@@ -511,7 +740,6 @@ export default function IncidentsScreen() {
               </View>
 
               <View style={styles.severityRow}>
-                {/* Display field */}
                 <TextInput
                   style={[styles.input, { flex: 1, color: AppColors.foreground }]}
                   value={newIncident.timing || "Select timing"}
@@ -519,8 +747,6 @@ export default function IncidentsScreen() {
                   placeholderTextColor="#94a3b8"
                   editable={false}
                 />
-
-                {/* Button */}
                 <TouchableOpacity
                   style={styles.severityButton}
                   onPress={() => setTimingOpen(true)}
@@ -571,13 +797,11 @@ export default function IncidentsScreen() {
                 </View>
               </Modal>
 
-              {/* Location Section */}
               <View style={styles.locationSectionHeader}>
                 <Ionicons name="location" size={16} color={AppColors.themeColor} />
                 <Text style={styles.locationSectionTitle}>Incident Location</Text>
               </View>
 
-              {/* Lat / Lng row */}
               <View style={styles.coordRow}>
                 <View style={styles.coordInputWrapper}>
                   <Ionicons name="navigate" size={14} color={AppColors.themeColor} style={styles.coordIcon} />
@@ -609,7 +833,6 @@ export default function IncidentsScreen() {
                 </View>
               </View>
 
-              {/* Interactive Map */}
               <View style={styles.mapContainer}>
                 <WebView
                   ref={mapWebViewRef}
@@ -663,7 +886,7 @@ export default function IncidentsScreen() {
               </Text>
             </View>
           ) : (
-            incidents.map((incident) => (
+            filteredIncidents.map((incident) => (
               <TouchableOpacity
                 key={incident.id}
                 style={styles.incidentCard}
@@ -680,7 +903,9 @@ export default function IncidentsScreen() {
                   </Text>
                 </View>
 
-                <Text style={styles.incidentTitle}>{incident.title}</Text>
+                <Text style={incident.userId === user?.id ? [styles.incidentTitle, { color: AppColors.themeColor }] : styles.incidentTitle}>
+                  {incident.title} {incident.userId === user?.id ? "👤" : ""}
+                </Text>
                 <Text style={styles.incidentDate}>
                   {format(incident.date, "MMM dd, yyyy")}
                 </Text>
@@ -714,11 +939,344 @@ export default function IncidentsScreen() {
                     {incident.peopleHelped}
                   </Text>
                 </View>
+
+                {incident.userId === user?.id && (
+                  <View style={styles.cardActionRow}>
+                    <TouchableOpacity
+                      style={[styles.cardActionButton, styles.editCardButton]}
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        startEditingIncident(incident);
+                      }}
+                    >
+                      <Ionicons name="pencil" size={13} color="#fff" />
+                      <Text style={styles.cardActionButtonText}>Edit</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.cardActionButton, styles.deleteCardButton]}
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        confirmDeleteIncident(incident.id);
+                      }}
+                    >
+                      <Ionicons name="trash" size={13} color="#fff" />
+                      <Text style={styles.cardActionButtonText}>Delete</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
               </TouchableOpacity>
             ))
           )}
+
+          {/* Load More Button */}
+          {!isLoading && filteredIncidents.length > 0 && (
+            <View style={styles.paginationContainer}>
+              {hasMore ? (
+                <TouchableOpacity
+                  style={styles.loadMoreButton}
+                  onPress={loadMoreIncidents}
+                  disabled={isMoreLoading}
+                >
+                  {isMoreLoading ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <Text style={styles.loadMoreText}>Load More</Text>
+                  )}
+                </TouchableOpacity>
+              ) : (
+                <Text style={styles.noMoreText}>No more incidents</Text>
+              )}
+            </View>
+          )}
         </View>
       </ScrollView>
+
+      {/* Edit Incident Fullscreen Modal */}
+      <Modal visible={editingIncident !== null} animationType="slide" onRequestClose={() => setEditingIncident(null)}>
+        <View style={[styles.container, { paddingTop: 40 }]}>
+          <View style={[styles.header, styles.detailHeader]}>
+            <Text style={styles.headerTitle}>Edit Incident</Text>
+            <TouchableOpacity onPress={() => setEditingIncident(null)}>
+              <Text style={styles.backButton}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+          <ScrollView style={styles.content}>
+            <View style={lastSectionStyle}>
+              <View style={styles.formCard}>
+                <TextInput
+                  style={styles.input}
+                  value={editForm.title}
+                  onChangeText={(value) =>
+                    setEditForm((prev) => ({ ...prev, title: value }))
+                  }
+                  placeholder="Title"
+                  placeholderTextColor="#94a3b8"
+                />
+
+                <TextInput
+                  style={[styles.input, styles.textArea]}
+                  value={editForm.description}
+                  onChangeText={(value) =>
+                    setEditForm((prev) => ({ ...prev, description: value }))
+                  }
+                  placeholder="Description"
+                  placeholderTextColor="#94a3b8"
+                  multiline
+                  numberOfLines={4}
+                />
+
+                <View style={styles.severityRow}>
+                  <TextInput
+                    style={[styles.input, { flex: 1, color: getSeverityColor(editForm.severity) }]}
+                    value={editForm.severity?.toUpperCase()}
+                    placeholder="Select severity"
+                    placeholderTextColor="#94a3b8"
+                    editable={false}
+                  />
+                  <TouchableOpacity
+                    style={styles.severityButton}
+                    onPress={() => setEditOpen(true)}
+                  >
+                    <Ionicons name="chevron-down" size={20} color="#fff" />
+                  </TouchableOpacity>
+                </View>
+
+                <Modal visible={editOpen} transparent animationType="fade">
+                  <Pressable
+                    style={styles.backdrop}
+                    onPress={() => setEditOpen(false)}
+                  />
+                  <View style={styles.modalBox}>
+                    <Text style={styles.title}>Select Severity</Text>
+                    {["low", "medium", "high", "critical"].map((item) => (
+                      <TouchableOpacity
+                        key={item}
+                        style={styles.option}
+                        onPress={() => {
+                          setEditForm((prev) => ({ ...prev, severity: item }));
+                          setEditOpen(false);
+                        }}
+                      >
+                        <Text style={[styles.optionText, { color: editForm.severity === item ? AppColors.themeColor : AppColors.foreground }]}>
+                          {editForm.severity === item && (
+                            <Ionicons name="checkmark" size={15} color={AppColors.themeColor} />
+                          )}
+                          {editForm.severity === item ? ' ' : ''}
+                          {item.toUpperCase()}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </Modal>
+
+                <TextInput
+                  style={styles.input}
+                  value={editForm.victim}
+                  onChangeText={(value) =>
+                    setEditForm((prev) => ({ ...prev, victim: value }))
+                  }
+                  placeholder="Victim"
+                  placeholderTextColor="#94a3b8"
+                />
+
+                <TextInput
+                  style={styles.input}
+                  value={editForm.attackers}
+                  onChangeText={(value) =>
+                    setEditForm((prev) => ({ ...prev, attackers: value }))
+                  }
+                  placeholder="Attackers"
+                  placeholderTextColor="#94a3b8"
+                />
+
+                <View style={styles.numberInputsRow}>
+                  <TextInput
+                    style={[styles.input, styles.numberInput]}
+                    value={editForm.deathToll}
+                    onChangeText={(value) =>
+                      setEditForm((prev) => ({ ...prev, deathToll: value }))
+                    }
+                    placeholder="Deaths"
+                    placeholderTextColor="#94a3b8"
+                    keyboardType="number-pad"
+                  />
+                  <TextInput
+                    style={[styles.input, styles.numberInput]}
+                    value={editForm.injuryCount}
+                    onChangeText={(value) =>
+                      setEditForm((prev) => ({ ...prev, injuryCount: value }))
+                    }
+                    placeholder="Injuries"
+                    placeholderTextColor="#94a3b8"
+                    keyboardType="number-pad"
+                  />
+                  <TextInput
+                    style={[styles.input, styles.numberInput]}
+                    value={editForm.peopleHelped}
+                    onChangeText={(value) =>
+                      setEditForm((prev) => ({ ...prev, peopleHelped: value }))
+                    }
+                    placeholder="Helpers"
+                    placeholderTextColor="#94a3b8"
+                    keyboardType="number-pad"
+                  />
+                </View>
+
+                <View style={styles.severityRow}>
+                  <TextInput
+                    style={[styles.input, { flex: 1, color: AppColors.foreground }]}
+                    value={editForm.timing || "Select timing"}
+                    placeholder="Select timing"
+                    placeholderTextColor="#94a3b8"
+                    editable={false}
+                  />
+                  <TouchableOpacity
+                    style={styles.severityButton}
+                    onPress={() => setEditTimingOpen(true)}
+                  >
+                    <Ionicons name="time-outline" size={20} color="#fff" />
+                  </TouchableOpacity>
+                </View>
+
+                <Modal visible={editTimingOpen} transparent animationType="fade">
+                  <Pressable
+                    style={styles.backdrop}
+                    onPress={() => setEditTimingOpen(false)}
+                  />
+                  <View style={styles.modalBox}>
+                    <Text style={styles.title}>Select Timing</Text>
+                    {[
+                      "Morning (08:00 – 11:00 AM)",
+                      "Midday (11:00 AM – 02:00 PM)",
+                      "Afternoon (02:00 – 05:00 PM)",
+                      "Evening (05:00 – 08:00 PM)",
+                      "Night (08:00 – 11:00 PM)",
+                      "Late Night (11:00 PM – 02:00 AM)",
+                      "Deep Night (02:00 – 05:00 AM)",
+                      "Dawn Watch (05:00 – 08:00 AM)",
+                    ].map((item) => (
+                      <TouchableOpacity
+                        key={item}
+                        style={styles.option}
+                        onPress={() => {
+                          setEditForm((prev) => ({ ...prev, timing: item }));
+                          setEditTimingOpen(false);
+                        }}
+                      >
+                        <Text style={[styles.optionText, { color: editForm.timing === item ? AppColors.themeColor : AppColors.foreground }]}>
+                          {editForm.timing === item && (
+                            <Ionicons name="checkmark" size={15} color={AppColors.themeColor} />
+                          )}
+                          {editForm.timing === item ? ' ' : ''}
+                          {item}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </Modal>
+
+                <View style={styles.locationSectionHeader}>
+                  <Ionicons name="location" size={16} color={AppColors.themeColor} />
+                  <Text style={styles.locationSectionTitle}>Incident Location</Text>
+                </View>
+
+                <View style={styles.coordRow}>
+                  <View style={styles.coordInputWrapper}>
+                    <Ionicons name="navigate" size={14} color={AppColors.themeColor} style={styles.coordIcon} />
+                    <TextInput
+                      style={styles.coordInput}
+                      value={editForm.latitude}
+                      onChangeText={(value) => {
+                        setEditForm((prev) => ({ ...prev, latitude: value }));
+                        const latNum = parseFloat(value);
+                        const lngNum = parseFloat(editForm.longitude);
+                        if (!isNaN(latNum) && !isNaN(lngNum)) {
+                          editMapWebViewRef.current?.injectJavaScript(`movePinTo(${latNum}, ${lngNum}); true;`);
+                        }
+                      }}
+                      placeholder="Latitude"
+                      placeholderTextColor="#94a3b8"
+                      keyboardType="numbers-and-punctuation"
+                    />
+                  </View>
+                  <View style={styles.coordInputWrapper}>
+                    <Ionicons name="navigate-outline" size={14} color={AppColors.themeColor} style={styles.coordIcon} />
+                    <TextInput
+                      style={styles.coordInput}
+                      value={editForm.longitude}
+                      onChangeText={(value) => {
+                        setEditForm((prev) => ({ ...prev, longitude: value }));
+                        const latNum = parseFloat(editForm.latitude);
+                        const lngNum = parseFloat(value);
+                        if (!isNaN(latNum) && !isNaN(lngNum)) {
+                          editMapWebViewRef.current?.injectJavaScript(`movePinTo(${latNum}, ${lngNum}); true;`);
+                        }
+                      }}
+                      placeholder="Longitude"
+                      placeholderTextColor="#94a3b8"
+                      keyboardType="numbers-and-punctuation"
+                    />
+                  </View>
+                </View>
+
+                <View style={styles.mapContainer}>
+                  <WebView
+                    ref={editMapWebViewRef}
+                    source={{
+                      html: buildMapHtml(
+                        parseFloat(editForm.latitude) || 23.8103,
+                        parseFloat(editForm.longitude) || 90.4125
+                      )
+                    }}
+                    onMessage={(event) => {
+                      try {
+                        const data = JSON.parse(event.nativeEvent.data);
+                        if (data.type === "locationSelected") {
+                          setEditForm((prev) => ({
+                            ...prev,
+                            latitude: data.lat.toFixed(6),
+                            longitude: data.lng.toFixed(6),
+                          }));
+                        }
+                      } catch { }
+                    }}
+                    style={styles.mapWebView}
+                    scrollEnabled={false}
+                    javaScriptEnabled
+                    domStorageEnabled
+                    originWhitelist={['*']}
+                  />
+                  <View style={styles.mapHint}>
+                    <Ionicons name="information-circle-outline" size={13} color={AppColors.muted} />
+                    <Text style={styles.mapHintText}>Tap on map or drag pin to set location</Text>
+                  </View>
+                </View>
+
+                <View style={styles.formActions}>
+                  <TouchableOpacity
+                    style={[styles.saveButton, isSubmitting && { opacity: 0.6 }]}
+                    onPress={handleUpdateIncident}
+                    disabled={isSubmitting}
+                  >
+                    {isSubmitting ? (
+                      <ActivityIndicator color="#fff" size="small" />
+                    ) : (
+                      <Text style={styles.saveButtonText}>Save Changes</Text>
+                    )}
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.cancelButton}
+                    onPress={() => setEditingIncident(null)}
+                    disabled={isSubmitting}
+                  >
+                    <Text style={styles.cancelButtonText}>Cancel</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          </ScrollView>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -735,6 +1293,11 @@ const styles = StyleSheet.create({
     backgroundColor: AppColors.background,
     borderBottomWidth: 1,
     borderBottomColor: AppColors.border,
+  },
+  detailHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
   headerTitle: {
     fontSize: 28,
@@ -814,6 +1377,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 8,
+    justifyContent: "center",
+    alignItems: "center",
   },
   saveButtonText: {
     color: "#fff",
@@ -824,6 +1389,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 8,
+    justifyContent: "center",
+    alignItems: "center",
   },
   cancelButtonText: {
     color: "#fff",
@@ -958,12 +1525,6 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0,0,0,0.4)",
     justifyContent: "flex-end",
   },
-  modal: {
-    backgroundColor: "#fff",
-    padding: 20,
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-  },
   title: {
     fontSize: 16,
     fontWeight: "600",
@@ -975,7 +1536,6 @@ const styles = StyleSheet.create({
     gap: 6,
     marginBottom: 10,
   },
-
   severityButton: {
     backgroundColor: AppColors.themeColor,
     paddingHorizontal: 10,
@@ -991,18 +1551,15 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
   },
-
   option: {
     paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: "#eee",
   },
-
   optionText: {
     fontSize: 14,
     fontWeight: "600",
   },
-
   locationSectionHeader: {
     flexDirection: "row",
     alignItems: "center",
@@ -1069,5 +1626,113 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: AppColors.muted,
     flex: 1,
+  },
+
+  // Added Custom Styles for Filters & Card Editing
+  filterContainer: {
+    flexDirection: "row",
+    gap: 8,
+    marginBottom: 16,
+    marginTop: 4,
+  },
+  filterChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: AppColors.surface,
+    borderWidth: 1,
+    borderColor: "rgba(240, 145, 41, 0.16)",
+  },
+  filterChipActive: {
+    backgroundColor: AppColors.themeColor,
+    borderColor: AppColors.themeColor,
+  },
+  filterChipText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: AppColors.foreground,
+  },
+  filterChipTextActive: {
+    color: "#ffffff",
+  },
+  cardActionRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: AppColors.border,
+    paddingTop: 10,
+    justifyContent: "flex-end",
+  },
+  cardActionButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
+  editCardButton: {
+    backgroundColor: "#3b82f6",
+  },
+  deleteCardButton: {
+    backgroundColor: "#ef4444",
+  },
+  cardActionButtonText: {
+    color: "#ffffff",
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  detailActionRow: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  detailActionButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
+  editDetailBtn: {
+    backgroundColor: "#3b82f6",
+  },
+  deleteDetailBtn: {
+    backgroundColor: "#ef4444",
+  },
+  detailActionButtonText: {
+    color: "#ffffff",
+    fontSize: 12,
+    fontWeight: "600",
+  },
+
+  // Pagination Styles
+  paginationContainer: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 20,
+    marginTop: 10,
+  },
+  loadMoreButton: {
+    backgroundColor: AppColors.themeColor,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 25,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  loadMoreText: {
+    color: "#ffffff",
+    fontSize: 14,
+    fontWeight: "bold",
+  },
+  noMoreText: {
+    color: AppColors.muted,
+    fontSize: 14,
+    fontStyle: "italic",
   },
 });

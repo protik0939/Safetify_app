@@ -109,6 +109,7 @@ export interface HeatmapData {
 
 export interface IncidentDetail {
   id: string;
+  userId?: string;
   location: Location;
   title: string;
   description: string;

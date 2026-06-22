@@ -98,8 +98,12 @@ export async function createIncident(
 }
 
 /** Get all incidents. */
-export async function getAllIncidents(): Promise<IncidentRecord[]> {
-  return apiFetch<IncidentRecord[]>("/incidents", {
+export async function getAllIncidents(limit?: number, offset?: number): Promise<IncidentRecord[]> {
+  const query = [];
+  if (limit !== undefined) query.push(`limit=${limit}`);
+  if (offset !== undefined) query.push(`offset=${offset}`);
+  const queryString = query.length > 0 ? `?${query.join("&")}` : "";
+  return apiFetch<IncidentRecord[]>(`/incidents${queryString}`, {
     method: "GET",
   });
 }

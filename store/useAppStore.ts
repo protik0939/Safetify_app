@@ -17,6 +17,7 @@ interface AppState {
   userLocation: Location | null;
   dangerZones: DangerZone[];
   activeSOSRequest: SOSRequest | null;
+  activeSOSIncidentId: string | null;
   sosHistory: SOSRequest[];
   notifications: PushNotification[];
   isSOSActive: boolean;
@@ -33,6 +34,7 @@ interface AppState {
   setCurrentLocation: (location: Location) => void;
   setDangerZones: (zones: DangerZone[]) => void;
   setActiveSOSRequest: (sos: SOSRequest | null) => void;
+  setActiveSOSIncidentId: (id: string | null) => void;
   addNotification: (notification: PushNotification) => void;
   removeNotification: (id: string) => void;
   setSOSActive: (active: boolean) => void;
@@ -55,6 +57,7 @@ export const useAppStore = create<AppState>()(
       userLocation: null,
       dangerZones: [],
       activeSOSRequest: null,
+      activeSOSIncidentId: null,
       sosHistory: [],
       notifications: [],
       isSOSActive: false,
@@ -70,6 +73,7 @@ export const useAppStore = create<AppState>()(
         set({ currentLocation, userLocation: currentLocation }),
       setDangerZones: (dangerZones) => set({ dangerZones }),
       setActiveSOSRequest: (activeSOSRequest) => set({ activeSOSRequest }),
+      setActiveSOSIncidentId: (activeSOSIncidentId) => set({ activeSOSIncidentId }),
       addNotification: (notification) =>
         set((state) => ({
           notifications: [notification, ...state.notifications],
@@ -113,6 +117,7 @@ export const useAppStore = create<AppState>()(
           userLocation: null,
           dangerZones: [],
           activeSOSRequest: null,
+          activeSOSIncidentId: null,
           sosHistory: [],
           notifications: [],
           isSOSActive: false,

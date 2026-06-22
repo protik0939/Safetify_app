@@ -192,6 +192,7 @@ export const generateMockIncidentDetails = (): IncidentDetail[] => [
     deathToll: 0,
     injuryCount: 1,
     peopleHelped: 3,
+    timing: 'Late Night (11:00 PM – 02:00 AM)',
     stories: [
       'Victim was walking home around 11 PM when approached by motorcycle riders',
       'Security guards from nearby building responded to screams',
@@ -210,6 +211,7 @@ export const generateMockIncidentDetails = (): IncidentDetail[] => [
     deathToll: 0,
     injuryCount: 1,
     peopleHelped: 2,
+    timing: 'Evening (05:00 – 08:00 PM)',
     stories: [
       'Chain snatched while victim was walking in the evening',
       'Nearby shopkeepers tried to chase the perpetrators',
@@ -228,6 +230,7 @@ export const generateMockIncidentDetails = (): IncidentDetail[] => [
     deathToll: 0,
     injuryCount: 0,
     peopleHelped: 5,
+    timing: 'Evening (05:00 – 08:00 PM)',
     stories: [
       'Victim was harassed while jogging in the evening',
       'Other joggers and local residents intervened',
@@ -246,6 +249,7 @@ export const generateMockIncidentDetails = (): IncidentDetail[] => [
     deathToll: 2,
     injuryCount: 15,
     peopleHelped: 20,
+    timing: 'Midday (11:00 AM – 02:00 PM)',
     stories: [
       'Two buses collided during rush hour traffic',
       'Local residents and emergency services responded quickly',
