@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Animated, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Animated, ScrollView, StyleSheet, Text, TouchableOpacity, View, Alert } from 'react-native';
+import { useLocalSearchParams } from 'expo-router';
 import Toast from '@/components/AppToast';
 import { WebView } from 'react-native-webview';
 import SafetifyLogo from '../../assets/images/safetifyLogo.svg';
@@ -131,8 +132,44 @@ const buildLeafletHTML = (
         if (d.type === 'updateLocation') {
           userMarker.setLatLng([d.lat, d.lng]);
           map.panTo([d.lat, d.lng]);
+        } else if (d.type === 'updateSOSState') {
+          updateSOSState(d.users);
         }
       } catch(_) {}
+    }
+
+    var sosMarkers = {};
+    function updateSOSState(users) {
+      var currentIds = users.map(function(u) { return u.userId; });
+      Object.keys(sosMarkers).forEach(function(id) {
+        if (currentIds.indexOf(id) === -1) {
+          map.removeLayer(sosMarkers[id]);
+          delete sosMarkers[id];
+        }
+      });
+
+      users.forEach(function(u) {
+        if (u.lat === undefined || u.lng === undefined) return;
+
+        var color = u.role === 'victim' ? '#dc2626' : '#16a34a';
+        var borderShadow = u.role === 'victim' ? '0 0 10px #dc2626' : '0 0 10px #16a34a';
+
+        var markerIcon = L.divIcon({
+          html: '<div style="display:flex;flex-direction:column;align-items:center;pointer-events:none;">' +
+                '<div style="background:' + color + ';color:#fff;font-size:9px;font-weight:bold;padding:2px 6px;border-radius:4px;white-space:nowrap;margin-bottom:2px;box-shadow:0 1px 4px rgba(0,0,0,0.3);">' + u.name + '</div>' +
+                '<div style="width:12px;height:12px;border-radius:50%;background:' + color + ';border:2px solid #fff;box-shadow:' + borderShadow + ';"></div>' +
+                '</div>',
+          iconSize: [60, 30],
+          iconAnchor: [30, 26],
+          className: '',
+        });
+
+        if (sosMarkers[u.userId]) {
+          sosMarkers[u.userId].setLatLng([u.lat, u.lng]);
+        } else {
+          sosMarkers[u.userId] = L.marker([u.lat, u.lng], { icon: markerIcon }).addTo(map);
+        }
+      });
     }
   </script>
 </body>
@@ -141,6 +178,13 @@ const buildLeafletHTML = (
 
 export default function DashboardScreen() {
   const { setCurrentLocation, setDangerZones, dangerZones } = useAppStore();
+  const user = useAppStore((s) => s.user);
+  const isSOSActive = useAppStore((s) => s.isSOSActive);
+  const activeSOSIncidentId = useAppStore((s) => s.activeSOSIncidentId);
+  const currentLocation = useAppStore((s) => s.currentLocation);
+
+  const { incidentId } = useLocalSearchParams<{ incidentId?: string }>();
+
   const [locationPermissionGranted, setLocationPermissionGranted] = useState(false);
   const [isRequestingLocation, setIsRequestingLocation] = useState(false);
   const [menuVisible, setMenuVisible] = useState(false);
@@ -148,6 +192,15 @@ export default function DashboardScreen() {
   const webViewRef = useRef<WebView>(null);
   const [mapCenter, setMapCenter] = useState({ latitude: 23.7808, longitude: 90.4132 });
   const [incidents, setIncidents] = useState<IncidentRecord[]>([]);
+
+  // WebSocket Live SOS Tracking state
+  const [activeSosId, setActiveSosId] = useState<string | null>(null);
+  const [isHelperMode, setIsHelperMode] = useState(false);
+  const [isProtectingAccepted, setIsProtectingAccepted] = useState(false);
+  const [sosUsers, setSosUsers] = useState<any[]>([]);
+  const [victimName, setVictimName] = useState<string | null>(null);
+  const [victimLocation, setVictimLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const wsRef = useRef<WebSocket | null>(null);
 
   const requestLocationPermission = async () => {
     setIsRequestingLocation(true);
@@ -213,6 +266,183 @@ export default function DashboardScreen() {
     } catch (error) {
       console.error('Failed to load incidents for map:', error);
     }
+  };
+
+  // Helper to dynamically construct WS url
+  const getWebSocketUrl = () => {
+    const baseUrl = process.env.EXPO_PUBLIC_BACKEND_URL || 'http://localhost:5000';
+    const wsProto = baseUrl.startsWith('https') ? 'wss' : 'ws';
+    const host = baseUrl.replace(/^https?:\/\//, '');
+    return `${wsProto}://${host}/ws`;
+  };
+
+  // Effect: Handle opening from push notification
+  useEffect(() => {
+    if (incidentId) {
+      console.log('[Dashboard] Opened from notification for SOS incident:', incidentId);
+      setActiveSosId(incidentId);
+      setIsHelperMode(true);
+      setIsProtectingAccepted(false);
+    }
+  }, [incidentId]);
+
+  // Effect: Sync our own SOS activation with activeSosId
+  useEffect(() => {
+    if (isSOSActive && activeSOSIncidentId) {
+      setActiveSosId(activeSOSIncidentId);
+      setIsHelperMode(false);
+      setIsProtectingAccepted(true); // Victim has already "accepted" their own SOS
+    } else if (!isSOSActive && !incidentId) {
+      setActiveSosId(null);
+      setIsHelperMode(false);
+      setSosUsers([]);
+      fetchIncidents(); // Refresh the normal incidents list on the map
+    }
+  }, [isSOSActive, activeSOSIncidentId, incidentId]);
+
+  // Effect: Handle WebSocket connection and state synchronization
+  useEffect(() => {
+    if (!activeSosId) {
+      if (wsRef.current) {
+        wsRef.current.close();
+        wsRef.current = null;
+      }
+      setSosUsers([]);
+      return;
+    }
+
+    // Skip connecting to WebSocket as responder if we haven't tapped "Protect him" yet
+    if (isHelperMode && !isProtectingAccepted) {
+      // Show the victim's static location
+      const findIncident = incidents.find(i => i.id === activeSosId);
+      if (findIncident) {
+        setVictimName(findIncident.user?.name || 'Someone');
+        setVictimLocation({ latitude: findIncident.latitude, longitude: findIncident.longitude });
+        setMapCenter({ latitude: findIncident.latitude, longitude: findIncident.longitude });
+      }
+      return;
+    }
+
+    const wsUrl = getWebSocketUrl();
+    console.log('[MapWS] Connecting to WebSocket:', wsUrl);
+    const socket = new WebSocket(wsUrl);
+    wsRef.current = socket;
+
+    socket.onopen = () => {
+      console.log('[MapWS] Connection opened. Joining room:', activeSosId);
+      socket.send(JSON.stringify({
+        type: 'join_sos',
+        data: {
+          userId: user?.id || 'unknown',
+          incidentId: activeSosId,
+          role: isHelperMode ? 'responder' : 'victim',
+          name: user?.name || 'User',
+          lat: currentLocation?.latitude,
+          lng: currentLocation?.longitude,
+        }
+      }));
+    };
+
+    socket.onmessage = (event) => {
+      try {
+        const payload = JSON.parse(event.data);
+        if (payload.type === 'sos_state') {
+          console.log('[MapWS] Received SOS state update:', payload.data);
+          const users = payload.data.users || [];
+          setSosUsers(users);
+
+          // Update Leaflet map markers inside WebView
+          const js = `handleMsg({ data: JSON.stringify({ type: 'updateSOSState', users: ${JSON.stringify(users)} }) }); true;`;
+          webViewRef.current?.injectJavaScript(js);
+
+          // If in helper mode, track victim's live location
+          if (isHelperMode) {
+            const victim = users.find((u: any) => u.role === 'victim');
+            if (victim && victim.lat !== undefined && victim.lng !== undefined) {
+              setVictimName(victim.name);
+              setVictimLocation({ latitude: victim.lat, longitude: victim.lng });
+              // Also update map center to victim
+              setMapCenter({ latitude: victim.lat, longitude: victim.lng });
+            }
+          }
+        }
+      } catch (err) {
+        console.error('[MapWS] Error parsing message:', err);
+      }
+    };
+
+    socket.onclose = () => {
+      console.log('[MapWS] Connection closed');
+    };
+
+    socket.onerror = (err) => {
+      console.error('[MapWS] Socket error:', err);
+    };
+
+    return () => {
+      socket.close();
+      wsRef.current = null;
+    };
+  }, [activeSosId, isHelperMode, isProtectingAccepted, incidents]);
+
+  // Effect: Stream our location updates to the WebSocket server
+  useEffect(() => {
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN && currentLocation) {
+      wsRef.current.send(JSON.stringify({
+        type: 'update_location',
+        data: {
+          lat: currentLocation.latitude,
+          lng: currentLocation.longitude,
+        }
+      }));
+    }
+  }, [currentLocation]);
+
+  // Handler: Responder accepts to help ("Protect Him" tap)
+  const handleProtectHim = async () => {
+    if (!activeSosId || !user) return;
+    try {
+      const BASE_URL = `${process.env.EXPO_PUBLIC_BACKEND_URL}/api/v1`;
+      const response = await fetch(`${BASE_URL}/incidents/${activeSosId}/respond`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          responderId: user.id,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to register help response.');
+      }
+
+      setIsProtectingAccepted(true);
+      Toast.show({
+        type: 'success',
+        text1: 'On Your Way!',
+        text2: 'Victim has been notified you are coming.',
+      });
+    } catch (err) {
+      console.error('[Protect] Error:', err);
+      Alert.alert('Error', 'Failed to register. Please try again.');
+    }
+  };
+
+  // Handler: Cancel SOS tracking or close SOS card
+  const handleStopSosTracking = () => {
+    if (wsRef.current) {
+      wsRef.current.close();
+      wsRef.current = null;
+    }
+    setActiveSosId(null);
+    setIsHelperMode(false);
+    setIsProtectingAccepted(false);
+    setSosUsers([]);
+    setVictimName(null);
+    setVictimLocation(null);
+    // Reload normal incidents map
+    fetchIncidents();
   };
 
   const leafletHTML = buildLeafletHTML(mapCenter.latitude, mapCenter.longitude, dangerZones, incidents);
@@ -325,6 +555,88 @@ export default function DashboardScreen() {
           </View>
         ))}
       </View>
+
+      {/* Real-time SOS bottom overlay card (only visible to responders to avoid overlapping victim UI) */}
+      {activeSosId && isHelperMode && (
+        <View style={styles.sosCardOverlay}>
+          <View style={styles.sosCardHeader}>
+            <View style={styles.sosStatusDot} />
+            <Text style={styles.sosCardTitle}>
+              {isHelperMode ? "Emergency SOS Nearby" : "Emergency SOS Active"}
+            </Text>
+          </View>
+
+          <Text style={styles.sosCardDetail}>
+            {isHelperMode
+              ? `Protecting: ${victimName || 'Someone in Danger'}`
+              : "Sharing your live location with nearby helpers."}
+          </Text>
+
+          <View style={styles.helpersSection}>
+            <Text style={styles.helpersCountTitle}>
+              <Ionicons name="people" size={16} color={AppColors.foreground} />{' '}
+              {sosUsers.filter(u => u.role === 'responder').length} Helper(s) En Route
+            </Text>
+            {sosUsers.filter(u => u.role === 'responder').length > 0 ? (
+              <Text style={styles.helperNamesList}>
+                {sosUsers.filter(u => u.role === 'responder').map(u => u.name).join(', ')}
+              </Text>
+            ) : (
+              <Text style={styles.helperNamesPlaceholder}>Waiting for responders to accept...</Text>
+            )}
+          </View>
+
+          {isHelperMode && !isProtectingAccepted && (
+            <TouchableOpacity
+              style={styles.protectButton}
+              onPress={handleProtectHim}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="shield-checkmark" size={20} color="#fff" />
+              <Text style={styles.protectButtonText}>Protect Him</Text>
+            </TouchableOpacity>
+          )}
+
+          {isHelperMode && isProtectingAccepted && (
+            <View style={styles.acceptedBanner}>
+              <Ionicons name="checkmark-circle" size={18} color="#22c55e" />
+              <Text style={styles.acceptedBannerText}>You are on the way to help</Text>
+            </View>
+          )}
+
+          <TouchableOpacity
+            style={styles.closeSosCardBtn}
+            onPress={handleStopSosTracking}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.closeSosCardBtnText}>
+              {isHelperMode ? "Close View" : "Stop Tracking"}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* Real-time helpers list floating button (visible only to the victim to prevent overlapping with "Send live details") */}
+      {!isHelperMode && activeSosId && (
+        <TouchableOpacity
+          style={styles.victimHelpersFloatingBtn}
+          onPress={() => {
+            const responders = sosUsers.filter(u => u.role === 'responder');
+            const names = responders.map(r => r.name).join('\n') || 'None yet';
+            Alert.alert(
+              'En Route Helpers',
+              `Total: ${responders.length} helper(s)\n\nNames:\n${names}`,
+              [{ text: 'OK' }]
+            );
+          }}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="people" size={18} color="#fff" />
+          <Text style={styles.victimHelpersFloatingBtnText}>
+            Helpers ({sosUsers.filter(u => u.role === 'responder').length})
+          </Text>
+        </TouchableOpacity>
+      )}
     </View>
   );
 }
@@ -505,5 +817,134 @@ const styles = StyleSheet.create({
   dangerZoneCount: {
     fontSize: 12,
     color: AppColors.foreground,
+  },
+  sosCardOverlay: {
+    position: 'absolute',
+    bottom: 24,
+    left: 16,
+    right: 16,
+    backgroundColor: '#1e293b',
+    borderRadius: 20,
+    padding: 20,
+    borderWidth: 1.5,
+    borderColor: '#ef4444',
+    shadowColor: '#ef4444',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 8,
+    zIndex: 100,
+  },
+  sosCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+    gap: 8,
+  },
+  sosStatusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#ef4444',
+  },
+  sosCardTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#f8fafc',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  sosCardDetail: {
+    fontSize: 14,
+    color: '#cbd5e1',
+    marginBottom: 16,
+  },
+  helpersSection: {
+    backgroundColor: '#0f172a',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 16,
+  },
+  helpersCountTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#94a3b8',
+    marginBottom: 4,
+  },
+  helperNamesList: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#22c55e',
+  },
+  helperNamesPlaceholder: {
+    fontSize: 13,
+    color: '#64748b',
+    fontStyle: 'italic',
+  },
+  protectButton: {
+    backgroundColor: '#22c55e',
+    borderRadius: 12,
+    paddingVertical: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginBottom: 8,
+  },
+  protectButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  acceptedBanner: {
+    backgroundColor: '#14532d',
+    borderRadius: 12,
+    paddingVertical: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#22c55e',
+  },
+  acceptedBannerText: {
+    color: '#22c55e',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  closeSosCardBtn: {
+    backgroundColor: '#334155',
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  closeSosCardBtnText: {
+    color: '#94a3b8',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  victimHelpersFloatingBtn: {
+    position: 'absolute',
+    top: 170,
+    right: 16,
+    backgroundColor: '#dc2626',
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    shadowColor: '#dc2626',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.4,
+    shadowRadius: 5,
+    elevation: 6,
+    zIndex: 100,
+  },
+  victimHelpersFloatingBtnText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '700',
   },
 });

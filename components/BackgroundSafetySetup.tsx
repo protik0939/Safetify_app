@@ -53,7 +53,7 @@ export function BackgroundSafetySetup() {
       <View style={styles.container}>
         <Text style={styles.title}>Initializing Safety System...</Text>
         {setupStatus.setupError && (
-          <Text style={styles.error}>{setupStatus.setupError}</Text>
+          <Text style={styles.errorText}>{setupStatus.setupError}</Text>
         )}
       </View>
     );

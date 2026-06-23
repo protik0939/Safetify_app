@@ -28,6 +28,7 @@ import { useAppStore } from "../../store/useAppStore";
 
 export default function IncidentsScreen() {
   const user = useAppStore((s) => s.user);
+  const isSOSActive = useAppStore((s) => s.isSOSActive);
   const [incidents, setIncidents] = useState<IncidentDetail[]>([]);
   const [selectedIncident, setSelectedIncident] =
     useState<IncidentDetail | null>(null);
@@ -82,9 +83,12 @@ export default function IncidentsScreen() {
   const [editOpen, setEditOpen] = useState(false);
   const [editTimingOpen, setEditTimingOpen] = useState(false);
 
+  // Fetch/reload incidents when user is not in active SOS mode
   useEffect(() => {
-    loadIncidents();
-  }, []);
+    if (!isSOSActive) {
+      loadIncidents();
+    }
+  }, [isSOSActive]);
 
   // Back button interception for Android hardware back button
   useEffect(() => {

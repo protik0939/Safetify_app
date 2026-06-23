@@ -18,6 +18,7 @@ export const unstable_settings = {
 export default function RootLayout() {
   const { expoPushToken, notification, error } = usePushNotifications();
 
+  const user = useAppStore((s) => s.user);
   const addNotification = useAppStore((s) => s.addNotification);
 
   // Mirror every incoming notification into our global Zustand store so any
@@ -42,7 +43,7 @@ export default function RootLayout() {
     });
   }, [notification]);
 
-  // Log the push token to the console (send this to your backend in production)
+  // Log and register push token to backend when authenticated
   useEffect(() => {
     if (expoPushToken) {
       console.log("[App] Expo Push Token registered:", expoPushToken);
@@ -50,7 +51,28 @@ export default function RootLayout() {
     if (error) {
       console.warn("[App] Push notification error:", error);
     }
-  }, [expoPushToken, error]);
+
+    if (user && expoPushToken) {
+      const BASE_URL = `${process.env.EXPO_PUBLIC_BACKEND_URL}/api/v1`;
+      fetch(`${BASE_URL}/user/push-token`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          userId: user.id,
+          pushToken: expoPushToken,
+        }),
+      })
+      .then((res) => res.json())
+      .then((data) => {
+        console.log("[App] Registered push token on backend:", data);
+      })
+      .catch((err) => {
+        console.warn("[App] Failed to register push token on backend:", err);
+      });
+    }
+  }, [user, expoPushToken, error]);
   
 
   return (

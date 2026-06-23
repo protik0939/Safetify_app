@@ -14,7 +14,11 @@ export type NotificationActionType = 'sos' | 'help_accepted' | 'dismiss' | 'open
 export interface NotificationAction {
   id: string;
   title: string;
-  options?: Notifications.NotificationActionOptions;
+  options?: {
+    isDestructive?: boolean;
+    isAuthenticationRequired?: boolean;
+    opensAppToForeground?: boolean;
+  };
 }
 
 /**
@@ -101,7 +105,7 @@ export const handleNotificationAction = async (
   response: Notifications.NotificationResponse
 ): Promise<void> => {
   const { notification } = response;
-  const { actionId } = response;
+  const actionId = response.actionIdentifier;
   const data = notification.request.content.data;
 
   console.log('[Notification Action] Action:', actionId, 'Data:', data);

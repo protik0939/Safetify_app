@@ -10,6 +10,7 @@ import * as TaskManager from 'expo-task-manager';
 import { DangerZone } from '../types';
 import { checkIfInDangerZone, getDistance } from './location';
 import { scheduleLocalNotification } from './notifications';
+import { useAppStore } from '../store/useAppStore';
 
 // Task name for background location updates
 export const BACKGROUND_LOCATION_TASK_NAME = 'background-location-updates';
@@ -29,11 +30,33 @@ export const initBackgroundLocationTask = () => {
 
     if (data) {
       const { locations } = data as { locations: Location.LocationObject[] };
-      
+
       if (locations && locations.length > 0) {
         const location = locations[locations.length - 1];
-        
-        // Store location and trigger danger zone check
+
+        // 1. Send update to backend server if user is logged in
+        try {
+          const user = useAppStore.getState().user;
+          if (user) {
+            const BASE_URL = `${process.env.EXPO_PUBLIC_BACKEND_URL}/api/v1`;
+            await fetch(`${BASE_URL}/user/location`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                userId: user.id,
+                latitude: location.coords.latitude,
+                longitude: location.coords.longitude,
+              }),
+            });
+            console.log('[Background Location] Sent update to server:', location.coords.latitude, location.coords.longitude);
+          }
+        } catch (err) {
+          console.warn('[Background Location] Failed to send location update to server:', err);
+        }
+
+        // 2. Store location and trigger local check
         try {
           await checkDangerZonesForLocation(location);
         } catch (err) {

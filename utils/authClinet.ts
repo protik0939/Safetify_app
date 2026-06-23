@@ -1,5 +1,5 @@
 import { createAuthClient } from "better-auth/react";
 
 export const authClient = createAuthClient({
-  baseURL: "https://kisser-talcum-murky.ngrok-free.dev",
+  baseURL: "https://safetify-backend-7aif.onrender.com",
 });

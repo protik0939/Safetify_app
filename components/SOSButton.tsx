@@ -1,10 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Animated, StyleSheet, Text, TouchableOpacity, View, TextInput, Alert, ActivityIndicator, Keyboard, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { Audio } from 'expo-av';
+import * as FileSystem from 'expo-file-system/legacy';
 import Toast from '@/components/AppToast';
 import { useAppStore } from '../store/useAppStore';
 import { generateMockSOSRequest } from '../utils/mockData';
 import { createIncident, updateIncident, getIncidentById } from '../utils/incidentApi';
+import { transcribeAudioApi } from '../utils/transcribeApi';
 import { AppColors } from '@/constants/theme';
 
 const getTimingFromDate = (date: Date): string => {
@@ -60,6 +63,7 @@ export default function SOSButton() {
   ]).current;
   const waveIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const recordTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const recordingRef = useRef<Audio.Recording | null>(null);
 
   const startHold = () => {
     if (!userLocation && !isSOSActive) {
@@ -207,60 +211,137 @@ export default function SOSButton() {
     waveAnims.forEach((anim) => anim.setValue(1));
   };
 
-  const startRecording = () => {
-    setIsRecording(true);
-    setIsTranscribing(false);
-    startWaveAnimation();
-    
-    // Automatically stop after 5 seconds
-    recordTimeoutRef.current = setTimeout(() => {
-      stopRecording();
-    }, 5000);
+  const startRecording = async () => {
+    try {
+      // 1. Request microphone permissions from expo-av
+      const permission = await Audio.requestPermissionsAsync();
+      if (!permission.granted) {
+        setMicPermissionGranted(false);
+        Alert.alert("Permission Denied", "Safetify needs microphone permission to record voice notes.");
+        return;
+      }
+      setMicPermissionGranted(true);
+
+      // 2. Set Audio Mode
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: true,
+        playsInSilentModeIOS: true,
+      });
+
+      // 3. Define Platform specific configuration
+      // iOS: WAV (LINEAR16), Android: AMR-WB
+      const customRecordingOptions = {
+        android: {
+          extension: '.3gp',
+          outputFormat: Audio.AndroidOutputFormat.AMR_WB,
+          audioEncoder: Audio.AndroidAudioEncoder.AMR_WB,
+          sampleRate: 16000,
+          numberOfChannels: 1,
+        },
+        ios: {
+          extension: '.wav',
+          audioQuality: Audio.IOSAudioQuality.HIGH,
+          sampleRate: 16000,
+          numberOfChannels: 1,
+          bitRate: 128000,
+          linearPCMBitDepth: 16,
+          linearPCMIsBigEndian: false,
+          linearPCMIsFloat: false,
+        },
+        web: {}
+      };
+
+      // 4. Start recording
+      setIsRecording(true);
+      setIsTranscribing(false);
+      startWaveAnimation();
+
+      const { recording } = await Audio.Recording.createAsync(
+        customRecordingOptions
+      );
+      recordingRef.current = recording;
+
+      // Automatically stop after 5 seconds to match UI limit
+      recordTimeoutRef.current = setTimeout(() => {
+        stopRecording();
+      }, 5000);
+    } catch (err) {
+      console.error('Failed to start recording', err);
+      Toast.show({
+        type: 'error',
+        text1: 'Recording Error',
+        text2: 'Failed to start microphone recording.',
+      });
+      setIsRecording(false);
+      stopWaveAnimation();
+    }
   };
 
-  const stopRecording = () => {
+  const stopRecording = async () => {
     if (recordTimeoutRef.current) {
       clearTimeout(recordTimeoutRef.current);
     }
     stopWaveAnimation();
-    setIsTranscribing(true);
-    
-    // Simulate transcribing typing effect
-    setTimeout(() => {
-      const phrases = [
-        "Help, there is an emergency near my location!",
-        "Injured person requires immediate assistance.",
-        "Need support immediately, threat encountered.",
-        "Please send emergency responder to my current location.",
-        "Encountered suspicious activity, heading to safety."
-      ];
-      const randomPhrase = phrases[Math.floor(Math.random() * phrases.length)];
-      setMessageText(randomPhrase);
+
+    const recording = recordingRef.current;
+    if (!recording) {
       setIsRecording(false);
       setIsTranscribing(false);
-      Toast.show({
-        type: 'success',
-        text1: 'Voice Transcribed',
-        text2: 'Voice notes successfully converted to text.',
+      return;
+    }
+
+    setIsTranscribing(true);
+
+    try {
+      // Stop recording and unload
+      await recording.stopAndUnloadAsync();
+      const uri = recording.getURI();
+      recordingRef.current = null;
+
+      if (!uri) {
+        throw new Error('No recording URI found');
+      }
+
+      // Convert local audio file to base64 string
+      const base64Audio = await FileSystem.readAsStringAsync(uri, {
+        encoding: 'base64',
       });
-    }, 1500);
+
+      // Detect format based on platform
+      const format = Platform.OS === 'ios' ? 'wav' : 'amr';
+
+      // Call API
+      const result = await transcribeAudioApi(base64Audio, format);
+
+      if (result.text.trim()) {
+        setMessageText(result.text.trim());
+        Toast.show({
+          type: 'success',
+          text1: 'Voice Transcribed',
+          text2: `Successfully transcribed (detected: ${result.languageCode})`,
+        });
+      } else {
+        Toast.show({
+          type: 'error',
+          text1: 'Transcription Empty',
+          text2: 'No speech could be recognized. Try speaking louder or closer.',
+        });
+      }
+    } catch (err: any) {
+      console.error('Failed to stop and transcribe recording', err);
+      Toast.show({
+        type: 'error',
+        text1: 'Transcription Error',
+        text2: err.message || 'Failed to convert voice to text.',
+      });
+    } finally {
+      setIsRecording(false);
+      setIsTranscribing(false);
+    }
   };
 
   const handleMicPress = () => {
-    if (micPermissionGranted === null) {
-      Alert.alert(
-        "Microphone Access Required",
-        "Safetify needs access to your microphone to transcribe voice notes for responders.",
-        [
-          { text: "Deny", style: "cancel", onPress: () => setMicPermissionGranted(false) },
-          { text: "Allow", onPress: () => {
-              setMicPermissionGranted(true);
-              startRecording();
-            }
-          }
-        ]
-      );
-    } else if (micPermissionGranted === false) {
+    if (micPermissionGranted === false) {
       Alert.alert("Permission Denied", "Please enable microphone permission in settings to transcribe voice notes.");
     } else {
       startRecording();
@@ -334,6 +415,13 @@ export default function SOSButton() {
       if (timerRef.current) clearInterval(timerRef.current);
       if (waveIntervalRef.current) clearInterval(waveIntervalRef.current);
       if (recordTimeoutRef.current) clearTimeout(recordTimeoutRef.current);
+      if (recordingRef.current) {
+        try {
+          recordingRef.current.stopAndUnloadAsync();
+        } catch (e) {
+          // ignore
+        }
+      }
     };
   }, []);
 

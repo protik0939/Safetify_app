@@ -1,7 +1,7 @@
 import { User, DangerZone, SOSRequest, SOSResponder, IncidentReport, IncidentDetail, RouteAlternative } from '../types';
 
 // Mock user data - Dhaka, Bangladesh
-export const mockUser: User = {
+export const mockUser: any = {
   id: 'user-123',
   email: 'user@example.com',
   name: 'John Doe',
