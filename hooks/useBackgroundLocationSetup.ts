@@ -71,6 +71,28 @@ export const useBackgroundLocationSetup = (
         onDangerZoneEnter(message, 'high');
       }
     },
+    onLocationUpdate: async (location) => {
+      const currentUser = useAppStore.getState().user;
+      if (currentUser) {
+        try {
+          const BASE_URL = `${process.env.EXPO_PUBLIC_BACKEND_URL}/api/v1`;
+          await fetch(`${BASE_URL}/user/location`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              userId: currentUser.id,
+              latitude: location.coords.latitude,
+              longitude: location.coords.longitude,
+            }),
+          });
+          console.log('[Background Setup] Sent location update to server:', location.coords.latitude, location.coords.longitude);
+        } catch (err) {
+          console.warn('[Background Setup] Failed to send location update to server:', err);
+        }
+      }
+    }
   });
 
   const notificationState = usePushNotifications();

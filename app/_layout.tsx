@@ -1,4 +1,4 @@
-import { usePushNotifications } from "@/hooks/usePushNotifications";
+import { useBackgroundLocationSetup } from "@/hooks/useBackgroundLocationSetup";
 import { useAppStore } from "@/store/useAppStore";
 import Toast from "@/components/AppToast";
 import { Stack } from "expo-router";
@@ -17,9 +17,10 @@ export const unstable_settings = {
  * whole session – including when the app is opened via a notification tap.
  */
 export default function RootLayout() {
-  const { expoPushToken, notification, error } = usePushNotifications();
-
   const user = useAppStore((s) => s.user);
+  const setup = useBackgroundLocationSetup({ enabled: !!user });
+  const { expoPushToken, notification, error } = setup.notificationState;
+
   const addNotification = useAppStore((s) => s.addNotification);
 
   // Mirror every incoming notification into our global Zustand store so any

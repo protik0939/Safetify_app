@@ -44,6 +44,7 @@ const buildLeafletHTML = (
       severity: inc.severityLevel || 'medium',
       color: getSeverityColor(inc.severityLevel || 'medium'),
       title: inc.title || 'Incident',
+      victimName: inc.user?.name || inc.victim || 'Someone',
     }))
   );
 
@@ -112,15 +113,23 @@ const buildLeafletHTML = (
         opacity: 0.6,
       }).addTo(map);
 
-      // Incident pin
+      // Incident pin with victim name bubble
+      var bubbleColor = inc.severity === 'critical' ? '#dc2626' : (inc.severity === 'high' ? '#f97316' : '#eab308');
+      var labelText = inc.victimName;
+      if (inc.title && inc.title.toLowerCase().includes('sos')) {
+        labelText = '🚨 ' + inc.victimName;
+      }
       var incIcon = L.divIcon({
-        html: '<div style="width:10px;height:10px;border-radius:50%;background:' + inc.color + ';border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,0.5);"></div>',
-        iconSize: [10, 10],
-        iconAnchor: [5, 5],
+        html: '<div style="display:flex;flex-direction:column;align-items:center;pointer-events:none;">' +
+              '<div style="background:' + bubbleColor + ';color:#fff;font-size:9px;font-weight:bold;padding:2px 6px;border-radius:4px;white-space:nowrap;margin-bottom:2px;box-shadow:0 1px 4px rgba(0,0,0,0.3);">' + labelText + '</div>' +
+              '<div style="width:10px;height:10px;border-radius:50%;background:' + inc.color + ';border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,0.5);"></div>' +
+              '</div>',
+        iconSize: [80, 30],
+        iconAnchor: [40, 26],
         className: '',
       });
       var marker = L.marker([inc.lat, inc.lng], { icon: incIcon }).addTo(map);
-      marker.bindPopup('<b>' + inc.title + '</b><br>' + inc.severity.toUpperCase());
+      marker.bindPopup('<b>' + inc.title + '</b><br><b>Victim:</b> ' + inc.victimName + '<br><b>Severity:</b> ' + inc.severity.toUpperCase());
     });
 
     // Receive location updates from React Native

@@ -125,48 +125,74 @@ export const handleNotificationAction = async (
   }
 };
 
+import { createIncident } from './incidentApi';
+
+const getTimingFromDate = (date: Date): string => {
+  const hour = date.getHours();
+  if (hour >= 8 && hour < 11) return "Morning (08:00 – 11:00 AM)";
+  if (hour >= 11 && hour < 14) return "Midday (11:00 AM – 02:00 PM)";
+  if (hour >= 14 && hour < 17) return "Afternoon (02:00 – 05:00 PM)";
+  if (hour >= 17 && hour < 20) return "Evening (05:00 – 08:00 PM)";
+  if (hour >= 20 && hour < 23) return "Night (08:00 – 11:00 PM)";
+  if (hour >= 23 || hour < 2) return "Late Night (11:00 PM – 02:00 AM)";
+  if (hour >= 2 && hour < 5) return "Deep Night (02:00 – 05:00 AM)";
+  return "Dawn Watch (05:00 – 08:00 AM)";
+};
+
 /**
  * Trigger SOS alert
  */
 export const triggerSOS = async (data: any): Promise<void> => {
   try {
-    const { setActiveSOSRequest, user, currentLocation, addNotification } = useAppStore.getState();
+    const { 
+      setActiveSOSRequest, 
+      setActiveSOSIncidentId, 
+      setSOSActive, 
+      user, 
+      currentLocation, 
+      addNotification 
+    } = useAppStore.getState();
 
     if (!user || !currentLocation) {
       console.error('[SOS] Missing user or location');
       return;
     }
 
+    const timing = getTimingFromDate(new Date());
+    const description = data.zoneType ? `Emergency near ${data.zoneType}` : 'Emergency SOS';
+    let remoteIncidentId = `sos-${Date.now()}`;
+
+    // Send SOS to server via createIncident
+    try {
+      const incident = await createIncident({
+        userId: user.id,
+        title: 'SOS Emergency',
+        description,
+        latitude: currentLocation.latitude,
+        longitude: currentLocation.longitude,
+        severityLevel: 'critical',
+        timing,
+      });
+      remoteIncidentId = incident.id;
+      setActiveSOSIncidentId(incident.id);
+      console.log('[SOS] SOS request sent to server, incident ID:', incident.id);
+    } catch (err) {
+      console.warn('[SOS] Failed to send to server:', err);
+    }
+
     // Create SOS request
     const sosRequest = {
-      id: `sos-${Date.now()}`,
+      id: remoteIncidentId,
       userId: user.id,
       location: currentLocation,
       status: 'active' as const,
       respondents: [],
       createdAt: new Date(),
-      description: data.zoneType ? `Emergency near ${data.zoneType}` : 'Emergency SOS',
+      description,
     };
 
     setActiveSOSRequest(sosRequest);
-
-    // Send SOS to server
-    try {
-      const sessionToken = useAppStore.getState().sessionToken;
-      await axios.post(
-        '/api/sos',
-        sosRequest,
-        {
-          headers: {
-            Authorization: `Bearer ${sessionToken}`,
-          },
-        }
-      );
-      console.log('[SOS] SOS request sent to server');
-    } catch (err) {
-      console.warn('[SOS] Failed to send to server:', err);
-      // Continue anyway - at least local SOS is active
-    }
+    setSOSActive(true);
 
     // Add notification to store
     addNotification({
@@ -202,21 +228,21 @@ export const acceptHelp = async (data: any): Promise<void> => {
 
     // Send help acceptance to server
     try {
-      const sessionToken = useAppStore.getState().sessionToken;
-      await axios.post(
-        `/api/sos/${sosId}/respond`,
-        {
-          responderId: user.id,
-          responderName: user.name,
-          location: currentLocation,
+      const BASE_URL = `${process.env.EXPO_PUBLIC_BACKEND_URL}/api/v1`;
+      const response = await fetch(`${BASE_URL}/incidents/${sosId}/respond`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
         },
-        {
-          headers: {
-            Authorization: `Bearer ${sessionToken}`,
-          },
-        }
-      );
-      console.log('[Help] Help response sent to server');
+        body: JSON.stringify({
+          responderId: user.id,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to register help response.');
+      }
+      console.log('[Help] Help response sent to server successfully');
     } catch (err) {
       console.warn('[Help] Failed to send help response:', err);
     }
