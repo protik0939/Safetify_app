@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Animated, ScrollView, StyleSheet, Text, TouchableOpacity, View, Alert } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useFocusEffect } from 'expo-router';
 import Toast from '@/components/AppToast';
 import { WebView } from 'react-native-webview';
 import SafetifyLogo from '../../assets/images/safetifyLogo.svg';
@@ -226,7 +226,11 @@ export default function DashboardScreen() {
         text2: 'Location access granted!',
       });
 
-      setDangerZones(generateMockDangerZones());
+      // Only set mock danger zones if we don't have any cached danger zones yet
+      const currentDangerZones = useAppStore.getState().dangerZones;
+      if (!currentDangerZones || currentDangerZones.length === 0) {
+        setDangerZones(generateMockDangerZones());
+      }
 
       watchLocation((newLocation) => {
         const lat = newLocation.coords.latitude;
@@ -254,17 +258,70 @@ export default function DashboardScreen() {
     setIsRequestingLocation(false);
   };
 
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchIncidents();
+    }, [])
+  );
+
   useEffect(() => {
     requestLocationPermission();
-    fetchIncidents();
   }, []);
 
   const fetchIncidents = async () => {
     try {
       const data = await getAllIncidents();
       setIncidents(data);
+      
+      // Update store caches too
+      const { setCachedIncidents, setDangerZones: storeSetDangerZones } = useAppStore.getState();
+      setCachedIncidents(data);
+      
+      // Update danger zones from the fetched incidents
+      const mappedDangerZones = data.map((incident) => {
+        const getSeverity = (level: string | null): 'low' | 'medium' | 'high' | 'critical' => {
+          if (!level) return 'medium';
+          const l = level.toLowerCase();
+          if (l === 'low' || l === 'medium' || l === 'high' || l === 'critical') {
+            return l as 'low' | 'medium' | 'high' | 'critical';
+          }
+          return 'medium';
+        };
+
+        const getRadius = (severity: 'low' | 'medium' | 'high' | 'critical'): number => {
+          switch (severity) {
+            case 'critical': return 0.5;
+            case 'high': return 0.4;
+            case 'medium': return 0.3;
+            case 'low': return 0.2;
+            default: return 0.3;
+          }
+        };
+
+        const severity = getSeverity(incident.severityLevel);
+        const radius = getRadius(severity);
+        return {
+          id: incident.id,
+          center: {
+            latitude: incident.latitude,
+            longitude: incident.longitude,
+            timestamp: new Date(incident.createdAt),
+          },
+          radius,
+          severity,
+          type: incident.title || "Incident",
+          count: 1,
+          lastUpdated: new Date(incident.updatedAt),
+        };
+      });
+      storeSetDangerZones(mappedDangerZones);
     } catch (error) {
-      console.error('Failed to load incidents for map:', error);
+      console.warn('Failed to load incidents for map (using offline fallback):', error);
+      // Fallback to locally cached incidents
+      const cached = useAppStore.getState().cachedIncidents;
+      if (cached && cached.length > 0) {
+        setIncidents(cached);
+      }
     }
   };
 

@@ -5,6 +5,7 @@ import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
 import "react-native-reanimated";
+import { getAllIncidents } from "@/utils/incidentApi";
 
 export const unstable_settings = {
   initialRouteName: "index",
@@ -74,6 +75,69 @@ export default function RootLayout() {
     }
   }, [user, expoPushToken, error]);
   
+  const isAuthenticated = useAppStore((s) => s.isAuthenticated);
+  const setCachedIncidents = useAppStore((s) => s.setCachedIncidents);
+  const setDangerZones = useAppStore((s) => s.setDangerZones);
+
+  // Download and cache incident data on startup or when auth changes
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    const downloadIncidentData = async () => {
+      try {
+        console.log("[App Layout] Downloading incident data for offline use...");
+        const incidents = await getAllIncidents();
+        
+        // Cache raw incidents
+        setCachedIncidents(incidents);
+
+        // Map and cache danger zones
+        const mappedDangerZones = incidents.map((incident) => {
+          const getSeverity = (level: string | null): "low" | "medium" | "high" | "critical" => {
+            if (!level) return "medium";
+            const l = level.toLowerCase();
+            if (l === "low" || l === "medium" || l === "high" || l === "critical") {
+              return l as "low" | "medium" | "high" | "critical";
+            }
+            return "medium";
+          };
+
+          const getRadius = (severity: "low" | "medium" | "high" | "critical"): number => {
+            switch (severity) {
+              case "critical": return 0.5;
+              case "high": return 0.4;
+              case "medium": return 0.3;
+              case "low": return 0.2;
+              default: return 0.3;
+            }
+          };
+
+          const severity = getSeverity(incident.severityLevel);
+          const radius = getRadius(severity);
+          return {
+            id: incident.id,
+            center: {
+              latitude: incident.latitude,
+              longitude: incident.longitude,
+              timestamp: new Date(incident.createdAt),
+            },
+            radius,
+            severity,
+            type: incident.title || "Incident",
+            count: 1,
+            lastUpdated: new Date(incident.updatedAt),
+          };
+        });
+
+        setDangerZones(mappedDangerZones);
+        console.log(`[App Layout] Successfully downloaded and cached ${incidents.length} incidents.`);
+      } catch (error) {
+        console.warn("[App Layout] Failed to download incident data (offline or server error). Using last cached data.", error);
+      }
+    };
+
+    downloadIncidentData();
+  }, [isAuthenticated, setCachedIncidents, setDangerZones]);
 
   return (
     <>

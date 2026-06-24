@@ -58,7 +58,8 @@ export const initBackgroundLocationTask = () => {
 
         // 2. Store location and trigger local check
         try {
-          await checkDangerZonesForLocation(location);
+          const dangerZones = useAppStore.getState().dangerZones;
+          await checkDangerZonesForLocation(location, dangerZones);
         } catch (err) {
           console.error('[Background Location] Failed to check danger zones:', err);
         }

@@ -8,6 +8,7 @@ import {
     SOSRequest,
     User,
 } from "../types";
+import { IncidentRecord } from "../utils/incidentApi";
 
 interface AppState {
   user: User | null;
@@ -16,6 +17,7 @@ interface AppState {
   currentLocation: Location | null;
   userLocation: Location | null;
   dangerZones: DangerZone[];
+  cachedIncidents: IncidentRecord[];
   activeSOSRequest: SOSRequest | null;
   activeSOSIncidentId: string | null;
   sosHistory: SOSRequest[];
@@ -33,6 +35,7 @@ interface AppState {
   setSessionToken: (token: string | null) => void;
   setCurrentLocation: (location: Location) => void;
   setDangerZones: (zones: DangerZone[]) => void;
+  setCachedIncidents: (incidents: IncidentRecord[]) => void;
   setActiveSOSRequest: (sos: SOSRequest | null) => void;
   setActiveSOSIncidentId: (id: string | null) => void;
   addNotification: (notification: PushNotification) => void;
@@ -56,6 +59,7 @@ export const useAppStore = create<AppState>()(
       currentLocation: null,
       userLocation: null,
       dangerZones: [],
+      cachedIncidents: [],
       activeSOSRequest: null,
       activeSOSIncidentId: null,
       sosHistory: [],
@@ -72,6 +76,7 @@ export const useAppStore = create<AppState>()(
       setCurrentLocation: (currentLocation) =>
         set({ currentLocation, userLocation: currentLocation }),
       setDangerZones: (dangerZones) => set({ dangerZones }),
+      setCachedIncidents: (cachedIncidents) => set({ cachedIncidents }),
       setActiveSOSRequest: (activeSOSRequest) => set({ activeSOSRequest }),
       setActiveSOSIncidentId: (activeSOSIncidentId) => set({ activeSOSIncidentId }),
       addNotification: (notification) =>
@@ -116,6 +121,7 @@ export const useAppStore = create<AppState>()(
           currentLocation: null,
           userLocation: null,
           dangerZones: [],
+          cachedIncidents: [],
           activeSOSRequest: null,
           activeSOSIncidentId: null,
           sosHistory: [],

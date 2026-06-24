@@ -1,5 +1,5 @@
 import { createAuthClient } from "better-auth/react";
 
 export const authClient = createAuthClient({
-  baseURL: "https://safetify-backend-7aif.onrender.com",
+  baseURL: process.env.EXPO_PUBLIC_BACKEND_URL,
 });
