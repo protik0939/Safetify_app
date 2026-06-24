@@ -8,6 +8,7 @@
 import axios from 'axios';
 import * as Notifications from 'expo-notifications';
 import { useAppStore } from '../store/useAppStore';
+import { router } from 'expo-router';
 
 export type NotificationActionType = 'sos' | 'help_accepted' | 'dismiss' | 'open';
 
@@ -111,6 +112,15 @@ export const handleNotificationAction = async (
   console.log('[Notification Action] Action:', actionId, 'Data:', data);
 
   switch (actionId) {
+    case Notifications.DEFAULT_ACTION_IDENTIFIER:
+      if (data && data.incidentId) {
+        console.log('[Notification Action] Redirecting to incident map for ID:', data.incidentId);
+        router.push({
+          pathname: '/',
+          params: { incidentId: data.incidentId as any }
+        });
+      }
+      break;
     case 'sos':
       await triggerSOS(data);
       break;

@@ -1,9 +1,10 @@
 import { useBackgroundLocationSetup } from "@/hooks/useBackgroundLocationSetup";
 import { useAppStore } from "@/store/useAppStore";
 import Toast from "@/components/AppToast";
-import { Stack } from "expo-router";
+import { Stack, router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
+import { Alert } from "react-native";
 import "react-native-reanimated";
 import { getAllIncidents } from "@/utils/incidentApi";
 
@@ -28,20 +29,42 @@ export default function RootLayout() {
   useEffect(() => {
     if (!notification) return;
 
+    const data = notification.request.content.data;
+    const title = notification.request.content.title ?? "Notification";
+    const body = notification.request.content.body ?? "";
+
+    if (data?.type === "sos_alert" && data?.incidentId) {
+      Alert.alert(
+        "🚨 Nearby SOS Alert!",
+        body || "Someone needs help nearby. Tap to view on map and respond.",
+        [
+          { text: "Ignore", style: "cancel" },
+          {
+            text: "Help Now",
+            style: "destructive",
+            onPress: () => {
+              router.push({
+                pathname: "/",
+                params: { incidentId: data.incidentId as any }
+              });
+            }
+          }
+        ]
+      );
+    }
+
     addNotification({
       id: notification.request.identifier,
-      title: notification.request.content.title ?? "Notification",
-      body: notification.request.content.body ?? "",
+      title,
+      body,
       type:
-        (notification.request.content.data?.type as
-          | "sos"
-          | "danger"
-          | "help_request"
-          | "route_suggestion") ?? "route_suggestion",
+        (data?.type === "sos_alert"
+          ? "sos"
+          : (data?.type as any)) ?? "route_suggestion",
       read: false,
       createdAt: new Date(),
-      userId: "", // Set to actual user ID from your auth store
-      data: notification.request.content.data ?? {},
+      userId: user?.id || "",
+      data: data ?? {},
     });
   }, [notification]);
 

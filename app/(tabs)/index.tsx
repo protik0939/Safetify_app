@@ -45,6 +45,7 @@ const buildLeafletHTML = (
       color: getSeverityColor(inc.severityLevel || 'medium'),
       title: inc.title || 'Incident',
       victimName: inc.user?.name || inc.victim || 'Someone',
+      status: inc.status,
     }))
   );
 
@@ -113,21 +114,32 @@ const buildLeafletHTML = (
         opacity: 0.6,
       }).addTo(map);
 
-      // Incident pin with victim name bubble
+      // Show name bubble ONLY for active SOS incidents
+      var isSOSActive = inc.title && inc.title.toLowerCase().includes('sos') && inc.status !== 'resolved';
       var bubbleColor = inc.severity === 'critical' ? '#dc2626' : (inc.severity === 'high' ? '#f97316' : '#eab308');
-      var labelText = inc.victimName;
-      if (inc.title && inc.title.toLowerCase().includes('sos')) {
-        labelText = '🚨 ' + inc.victimName;
+      
+      var incIcon;
+      if (isSOSActive) {
+        var labelText = '🚨 ' + inc.victimName;
+        incIcon = L.divIcon({
+          html: '<div style="display:flex;flex-direction:column;align-items:center;pointer-events:none;">' +
+                '<div style="background:' + bubbleColor + ';color:#fff;font-size:9px;font-weight:bold;padding:2px 6px;border-radius:4px;white-space:nowrap;margin-bottom:2px;box-shadow:0 1px 4px rgba(0,0,0,0.3);">' + labelText + '</div>' +
+                '<div style="width:10px;height:10px;border-radius:50%;background:' + inc.color + ';border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,0.5);"></div>' +
+                '</div>',
+          iconSize: [80, 30],
+          iconAnchor: [40, 26],
+          className: '',
+        });
+      } else {
+        // Normal pin, no name bubble
+        incIcon = L.divIcon({
+          html: '<div style="width:10px;height:10px;border-radius:50%;background:' + inc.color + ';border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,0.5);"></div>',
+          iconSize: [10, 10],
+          iconAnchor: [5, 5],
+          className: '',
+        });
       }
-      var incIcon = L.divIcon({
-        html: '<div style="display:flex;flex-direction:column;align-items:center;pointer-events:none;">' +
-              '<div style="background:' + bubbleColor + ';color:#fff;font-size:9px;font-weight:bold;padding:2px 6px;border-radius:4px;white-space:nowrap;margin-bottom:2px;box-shadow:0 1px 4px rgba(0,0,0,0.3);">' + labelText + '</div>' +
-              '<div style="width:10px;height:10px;border-radius:50%;background:' + inc.color + ';border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,0.5);"></div>' +
-              '</div>',
-        iconSize: [80, 30],
-        iconAnchor: [40, 26],
-        className: '',
-      });
+      
       var marker = L.marker([inc.lat, inc.lng], { icon: incIcon }).addTo(map);
       marker.bindPopup('<b>' + inc.title + '</b><br><b>Victim:</b> ' + inc.victimName + '<br><b>Severity:</b> ' + inc.severity.toUpperCase());
     });
@@ -161,17 +173,31 @@ const buildLeafletHTML = (
         if (u.lat === undefined || u.lng === undefined) return;
 
         var color = u.role === 'victim' ? '#dc2626' : '#16a34a';
-        var borderShadow = u.role === 'victim' ? '0 0 10px #dc2626' : '0 0 10px #16a34a';
+        var borderShadow = u.role === 'victim' ? '0 0 10px #dc2626' : '0 0 15px #16a34a';
 
-        var markerIcon = L.divIcon({
-          html: '<div style="display:flex;flex-direction:column;align-items:center;pointer-events:none;">' +
-                '<div style="background:' + color + ';color:#fff;font-size:9px;font-weight:bold;padding:2px 6px;border-radius:4px;white-space:nowrap;margin-bottom:2px;box-shadow:0 1px 4px rgba(0,0,0,0.3);">' + u.name + '</div>' +
-                '<div style="width:12px;height:12px;border-radius:50%;background:' + color + ';border:2px solid #fff;box-shadow:' + borderShadow + ';"></div>' +
-                '</div>',
-          iconSize: [60, 30],
-          iconAnchor: [30, 26],
-          className: '',
-        });
+        var markerIcon;
+        if (u.role === 'victim') {
+          markerIcon = L.divIcon({
+            html: '<div style="display:flex;flex-direction:column;align-items:center;pointer-events:none;">' +
+                  '<div style="background:' + color + ';color:#fff;font-size:9px;font-weight:bold;padding:2px 6px;border-radius:4px;white-space:nowrap;margin-bottom:2px;box-shadow:0 1px 4px rgba(0,0,0,0.3);">' + u.name + '</div>' +
+                  '<div style="width:12px;height:12px;border-radius:50%;background:' + color + ';border:2px solid #fff;box-shadow:' + borderShadow + ';"></div>' +
+                  '</div>',
+            iconSize: [60, 30],
+            iconAnchor: [30, 26],
+            className: '',
+          });
+        } else {
+          // Responder shield shape to show he is responding to help the person
+          markerIcon = L.divIcon({
+            html: '<div style="display:flex;flex-direction:column;align-items:center;pointer-events:none;">' +
+                  '<div style="background:#16a34a;color:#fff;font-size:9px;font-weight:bold;padding:2px 6px;border-radius:4px;white-space:nowrap;margin-bottom:2px;box-shadow:0 1px 4px rgba(0,0,0,0.3);">🛡️ ' + u.name + ' (Helper)</div>' +
+                  '<div style="width:14px;height:16px;background:#16a34a;border:2px solid #fff;border-radius:2px 2px 7px 7px;box-shadow:' + borderShadow + ';display:flex;align-items:center;justify-content:center;"><span style="color:#fff;font-size:7px;font-weight:bold;line-height:1;">🛡️</span></div>' +
+                  '</div>',
+            iconSize: [100, 30],
+            iconAnchor: [50, 26],
+            className: '',
+          });
+        }
 
         if (sosMarkers[u.userId]) {
           sosMarkers[u.userId].setLatLng([u.lat, u.lng]);
@@ -275,6 +301,13 @@ export default function DashboardScreen() {
 
   useEffect(() => {
     requestLocationPermission();
+
+    // Refresh active incidents list in the background every 15s to capture live/resolved status
+    const interval = setInterval(() => {
+      fetchIncidents();
+    }, 15000);
+
+    return () => clearInterval(interval);
   }, []);
 
   const fetchIncidents = async () => {

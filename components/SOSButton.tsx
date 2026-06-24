@@ -212,7 +212,15 @@ export default function SOSButton() {
     }
   };
 
-  const cancelSOS = () => {
+  const cancelSOS = async () => {
+    if (activeSOSIncidentId) {
+      try {
+        await updateIncident(activeSOSIncidentId, { status: 'resolved' });
+        console.log('[SOS] SOS marked as resolved on backend');
+      } catch (err) {
+        console.warn('[SOS] Failed to resolve SOS on backend:', err);
+      }
+    }
     setActiveSOSRequest(null);
     setActiveSOSIncidentId(null);
     setSOSActive(false);

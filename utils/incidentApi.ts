@@ -21,6 +21,7 @@ export interface IncidentPayload {
   injuryCount?: number;
   peopleHelped?: number;
   stories?: string[];
+  status?: string;
 }
 
 export interface IncidentRecord {
