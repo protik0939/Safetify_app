@@ -1,5 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Platform } from "react-native";
+import { useAppStore } from "../store/useAppStore";
+import { router } from "expo-router";
 
 const PRIMARY_BASE_URL = `${process.env.EXPO_PUBLIC_BACKEND_URL}/api/v1`;
 
@@ -82,6 +84,11 @@ export interface AuthResponse {
 // ---------------------------------------------------------------------------
 
 async function handleResponse<T>(res: Response): Promise<T> {
+  if (res.status === 401) {
+    await clearSessionToken();
+    useAppStore.getState().logout();
+    router.replace("/login");
+  }
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     const message = `Request failed (${res.status})`;
@@ -195,6 +202,24 @@ export async function updateUser(userId: string, payload: any): Promise<any> {
     method: "PUT",
     headers,
     body: JSON.stringify(payload),
+  });
+  return handleResponse<any>(res);
+}
+
+export async function sendOTP(email: string): Promise<any> {
+  const res = await fetchWithBaseUrlFallback("/auth/send-otp", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email }),
+  });
+  return handleResponse<any>(res);
+}
+
+export async function verifyOTP(email: string, otp: string): Promise<any> {
+  const res = await fetchWithBaseUrlFallback("/auth/verify-otp", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, otp }),
   });
   return handleResponse<any>(res);
 }

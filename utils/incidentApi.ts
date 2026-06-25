@@ -1,7 +1,10 @@
 import {
   authHeaders,
   fetchWithBaseUrlFallback,
+  clearSessionToken,
 } from "./authApi";
+import { router } from "expo-router";
+import { useAppStore } from "../store/useAppStore";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -48,6 +51,16 @@ export interface IncidentRecord {
     name: string;
     email: string;
   };
+  incidentResponders?: Array<{
+    id: string;
+    responderId: string;
+    status: string;
+    responder: {
+      id: string;
+      name: string;
+      email: string;
+    };
+  }>;
 }
 
 interface ApiResponse<T> {
@@ -69,6 +82,12 @@ async function apiFetch<T>(
     ...init,
     headers: { ...headers, ...init.headers },
   });
+
+  if (res.status === 401) {
+    await clearSessionToken();
+    useAppStore.getState().logout();
+    router.replace("/login");
+  }
 
   const raw = await res.json().catch(() => ({}));
 
@@ -123,6 +142,15 @@ export async function getIncidentsByUserId(
   userId: string,
 ): Promise<IncidentRecord[]> {
   return apiFetch<IncidentRecord[]>(`/incidents/user/${userId}`, {
+    method: "GET",
+  });
+}
+
+/** Get incidents created or responded by a user (History). */
+export async function getIncidentHistory(
+  userId: string,
+): Promise<IncidentRecord[]> {
+  return apiFetch<IncidentRecord[]>(`/incidents/history/${userId}`, {
     method: "GET",
   });
 }

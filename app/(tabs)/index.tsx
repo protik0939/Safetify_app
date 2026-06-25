@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Animated, ScrollView, StyleSheet, Text, TouchableOpacity, View, Alert } from 'react-native';
-import { useLocalSearchParams, useFocusEffect } from 'expo-router';
+import { ActivityIndicator, Animated, ScrollView, StyleSheet, Text, TouchableOpacity, View, Alert, Modal } from 'react-native';
+import { useLocalSearchParams, useFocusEffect, router } from 'expo-router';
 import Toast from '@/components/AppToast';
 import { WebView } from 'react-native-webview';
 import SafetifyLogo from '../../assets/images/safetifyLogo.svg';
@@ -39,6 +39,7 @@ const buildLeafletHTML = (
 
   const incidentsJSON = JSON.stringify(
     incidents.map((inc) => ({
+      id: inc.id,
       lat: inc.latitude,
       lng: inc.longitude,
       severity: inc.severityLevel || 'medium',
@@ -141,8 +142,20 @@ const buildLeafletHTML = (
       }
       
       var marker = L.marker([inc.lat, inc.lng], { icon: incIcon }).addTo(map);
-      marker.bindPopup('<b>' + inc.title + '</b><br><b>Victim:</b> ' + inc.victimName + '<br><b>Severity:</b> ' + inc.severity.toUpperCase());
+      if (isSOSActive) {
+        marker.bindPopup('<b>' + inc.title + '</b><br><b>Victim:</b> ' + inc.victimName + '<br><b>Severity:</b> ' + inc.severity.toUpperCase() + '<br><button onclick="selectSOS(&#39;' + inc.id + '&#39;)" style="background:#ef4444;color:#fff;border:none;padding:6px;border-radius:4px;margin-top:6px;width:100%;font-weight:bold;cursor:pointer;">Go to Help</button><button onclick="seeDetails(&#39;' + inc.id + '&#39;)" style="background:#3b82f6;color:#fff;border:none;padding:6px;border-radius:4px;margin-top:6px;width:100%;font-weight:bold;cursor:pointer;">See Details</button>');
+      } else {
+        marker.bindPopup('<b>' + inc.title + '</b><br><b>Victim:</b> ' + inc.victimName + '<br><b>Severity:</b> ' + inc.severity.toUpperCase() + '<br><button onclick="seeDetails(&#39;' + inc.id + '&#39;)" style="background:#3b82f6;color:#fff;border:none;padding:6px;border-radius:4px;margin-top:6px;width:100%;font-weight:bold;cursor:pointer;">See Details</button>');
+      }
     });
+
+    function selectSOS(incidentId) {
+      window.ReactNativeWebView.postMessage('selectSOS:' + incidentId);
+    }
+
+    function seeDetails(incidentId) {
+      window.ReactNativeWebView.postMessage('seeDetails:' + incidentId);
+    }
 
     // Receive location updates from React Native
     document.addEventListener('message', handleMsg);
@@ -160,7 +173,15 @@ const buildLeafletHTML = (
     }
 
     var sosMarkers = {};
+    var helperLines = [];
+
     function updateSOSState(users) {
+      // Clear old lines
+      helperLines.forEach(function(line) {
+        map.removeLayer(line);
+      });
+      helperLines = [];
+
       var currentIds = users.map(function(u) { return u.userId; });
       Object.keys(sosMarkers).forEach(function(id) {
         if (currentIds.indexOf(id) === -1) {
@@ -168,6 +189,9 @@ const buildLeafletHTML = (
           delete sosMarkers[id];
         }
       });
+
+      // Find the victim's location
+      var victim = users.find(function(u) { return u.role === 'victim'; });
 
       users.forEach(function(u) {
         if (u.lat === undefined || u.lng === undefined) return;
@@ -187,16 +211,27 @@ const buildLeafletHTML = (
             className: '',
           });
         } else {
-          // Responder shield shape to show he is responding to help the person
+          // Responder shield shape with running person (rebranded from static shield)
           markerIcon = L.divIcon({
             html: '<div style="display:flex;flex-direction:column;align-items:center;pointer-events:none;">' +
-                  '<div style="background:#16a34a;color:#fff;font-size:9px;font-weight:bold;padding:2px 6px;border-radius:4px;white-space:nowrap;margin-bottom:2px;box-shadow:0 1px 4px rgba(0,0,0,0.3);">🛡️ ' + u.name + ' (Helper)</div>' +
-                  '<div style="width:14px;height:16px;background:#16a34a;border:2px solid #fff;border-radius:2px 2px 7px 7px;box-shadow:' + borderShadow + ';display:flex;align-items:center;justify-content:center;"><span style="color:#fff;font-size:7px;font-weight:bold;line-height:1;">🛡️</span></div>' +
+                  '<div style="background:#16a34a;color:#fff;font-size:9px;font-weight:bold;padding:2px 6px;border-radius:4px;white-space:nowrap;margin-bottom:2px;box-shadow:0 1px 4px rgba(0,0,0,0.3);">🏃‍♂️ ' + u.name + ' (Helper)</div>' +
+                  '<div style="width:14px;height:16px;background:#16a34a;border:2px solid #fff;border-radius:2px 2px 7px 7px;box-shadow:' + borderShadow + ';display:flex;align-items:center;justify-content:center;"><span style="color:#fff;font-size:7px;font-weight:bold;line-height:1;">🏃‍♂️</span></div>' +
                   '</div>',
             iconSize: [100, 30],
             iconAnchor: [50, 26],
             className: '',
           });
+
+          // Draw dotted polyline connecting responder and victim
+          if (victim && victim.lat !== undefined && victim.lng !== undefined) {
+            var line = L.polyline([[u.lat, u.lng], [victim.lat, victim.lng]], {
+              color: '#16a34a',
+              weight: 3,
+              dashArray: '6, 8',
+              opacity: 0.8
+            }).addTo(map);
+            helperLines.push(line);
+          }
         }
 
         if (sosMarkers[u.userId]) {
@@ -235,6 +270,7 @@ export default function DashboardScreen() {
   const [sosUsers, setSosUsers] = useState<any[]>([]);
   const [victimName, setVictimName] = useState<string | null>(null);
   const [victimLocation, setVictimLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [showActiveSosList, setShowActiveSosList] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
 
   const requestLocationPermission = async () => {
@@ -592,6 +628,10 @@ export default function DashboardScreen() {
     );
   }
 
+  const activeSosIncidents = incidents.filter(
+    (inc) => inc.title?.toLowerCase().includes('sos') && inc.status !== 'resolved'
+  );
+
   return (
     <View style={styles.container}>
       <WebView
@@ -603,7 +643,99 @@ export default function DashboardScreen() {
         domStorageEnabled
         mixedContentMode="always"
         allowUniversalAccessFromFileURLs
+        onMessage={(event) => {
+          try {
+            const data = event.nativeEvent.data;
+            if (typeof data === 'string' && data.startsWith('selectSOS:')) {
+              const incidentId = data.replace('selectSOS:', '');
+              console.log('[Dashboard] Selected SOS from map popup:', incidentId);
+              setActiveSosId(incidentId);
+              setIsHelperMode(true);
+              setIsProtectingAccepted(false);
+              const findIncident = incidents.find(i => i.id === incidentId);
+              if (findIncident) {
+                setVictimName(findIncident.user?.name || findIncident.victim || 'Someone');
+                setVictimLocation({ latitude: findIncident.latitude, longitude: findIncident.longitude });
+                setMapCenter({ latitude: findIncident.latitude, longitude: findIncident.longitude });
+              }
+            } else if (typeof data === 'string' && data.startsWith('seeDetails:')) {
+              const incidentId = data.replace('seeDetails:', '');
+              console.log('[Dashboard] Selected See Details for incident:', incidentId);
+              router.navigate({
+                pathname: "/incidents",
+                params: { viewIncidentId: incidentId }
+              });
+            }
+          } catch (err) {
+            console.error('[WebView] onMessage error:', err);
+          }
+        }}
       />
+
+      {activeSosIncidents.length > 0 && !activeSosId && (
+        <TouchableOpacity
+          style={styles.activeSosBadge}
+          onPress={() => setShowActiveSosList(true)}
+          activeOpacity={0.8}
+        >
+          <View style={styles.activeSosBadgeDot} />
+          <Text style={styles.activeSosBadgeText}>
+            Who is in SOS ({activeSosIncidents.length})
+          </Text>
+        </TouchableOpacity>
+      )}
+
+      {/* Active SOS List Modal */}
+      <Modal
+        visible={showActiveSosList}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowActiveSosList(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.activeSosModalCard}>
+            <View style={styles.modalHeaderRow}>
+              <Text style={styles.modalTitle}>🚨 People in SOS</Text>
+              <TouchableOpacity onPress={() => setShowActiveSosList(false)}>
+                <Ionicons name="close-circle" size={26} color="#94a3b8" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView contentContainerStyle={styles.modalScrollContent}>
+              {activeSosIncidents.length > 0 ? (
+                activeSosIncidents.map((incident) => (
+                  <View key={incident.id} style={styles.activeSosListItem}>
+                    <View style={styles.listItemLeft}>
+                      <Text style={styles.victimNameText}>
+                        👤 {incident.user?.name || incident.victim || 'Someone'}
+                      </Text>
+                      <Text style={styles.victimIncidentDetail}>
+                        Status: Active SOS | Severity: {incident.severityLevel || 'Critical'}
+                      </Text>
+                    </View>
+                    <TouchableOpacity
+                      style={styles.listItemHelpBtn}
+                      onPress={() => {
+                        setActiveSosId(incident.id);
+                        setIsHelperMode(true);
+                        setIsProtectingAccepted(false);
+                        setShowActiveSosList(false);
+                        setVictimName(incident.user?.name || incident.victim || 'Someone');
+                        setVictimLocation({ latitude: incident.latitude, longitude: incident.longitude });
+                        setMapCenter({ latitude: incident.latitude, longitude: incident.longitude });
+                      }}
+                    >
+                      <Text style={styles.listItemHelpBtnText}>Go to Help</Text>
+                    </TouchableOpacity>
+                  </View>
+                ))
+              ) : (
+                <Text style={styles.noActiveSosText}>No active SOS emergencies right now.</Text>
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
 
       <View style={styles.topPanel}>
         <View style={styles.header}>
@@ -692,7 +824,7 @@ export default function DashboardScreen() {
               activeOpacity={0.8}
             >
               <Ionicons name="shield-checkmark" size={20} color="#fff" />
-              <Text style={styles.protectButtonText}>Protect Him</Text>
+              <Text style={styles.protectButtonText}>Going to Help</Text>
             </TouchableOpacity>
           )}
 
@@ -715,26 +847,26 @@ export default function DashboardScreen() {
         </View>
       )}
 
-      {/* Real-time helpers list floating button (visible only to the victim to prevent overlapping with "Send live details") */}
+      {/* Real-time helpers list panel (visible only to the victim) */}
       {!isHelperMode && activeSosId && (
-        <TouchableOpacity
-          style={styles.victimHelpersFloatingBtn}
-          onPress={() => {
-            const responders = sosUsers.filter(u => u.role === 'responder');
-            const names = responders.map(r => r.name).join('\n') || 'None yet';
-            Alert.alert(
-              'En Route Helpers',
-              `Total: ${responders.length} helper(s)\n\nNames:\n${names}`,
-              [{ text: 'OK' }]
-            );
-          }}
-          activeOpacity={0.8}
-        >
-          <Ionicons name="people" size={18} color="#fff" />
-          <Text style={styles.victimHelpersFloatingBtnText}>
-            Helpers ({sosUsers.filter(u => u.role === 'responder').length})
+        <View style={styles.victimHelpersPanel}>
+          <Text style={styles.victimHelpersTitle}>
+            🚨 Helpers Coming ({sosUsers.filter(u => u.role === 'responder').length})
           </Text>
-        </TouchableOpacity>
+          <ScrollView style={styles.victimHelpersScroll}>
+            {sosUsers.filter(u => u.role === 'responder').length > 0 ? (
+              sosUsers.filter(u => u.role === 'responder').map((r) => (
+                <View key={r.userId} style={styles.victimHelperRow}>
+                  <View style={styles.helperDot} />
+                  <Text style={styles.victimHelperName} numberOfLines={1}>🏃‍♂️ {r.name}</Text>
+                  <Text style={styles.victimHelperStatus}>En Route</Text>
+                </View>
+              ))
+            ) : (
+              <Text style={styles.helperNamesPlaceholder}>Waiting for helpers...</Text>
+            )}
+          </ScrollView>
+        </View>
       )}
     </View>
   );
@@ -919,7 +1051,7 @@ const styles = StyleSheet.create({
   },
   sosCardOverlay: {
     position: 'absolute',
-    bottom: 24,
+    bottom: 95,
     left: 16,
     right: 16,
     backgroundColor: '#1e293b',
@@ -1023,10 +1155,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
-  victimHelpersFloatingBtn: {
+  activeSosBadge: {
     position: 'absolute',
     top: 170,
-    right: 16,
+    left: 16,
     backgroundColor: '#dc2626',
     borderRadius: 20,
     paddingHorizontal: 14,
@@ -1041,9 +1173,142 @@ const styles = StyleSheet.create({
     elevation: 6,
     zIndex: 100,
   },
-  victimHelpersFloatingBtnText: {
+  activeSosBadgeDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#ffffff',
+  },
+  activeSosBadgeText: {
     color: '#ffffff',
     fontSize: 12,
     fontWeight: '700',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.75)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  activeSosModalCard: {
+    width: '100%',
+    maxHeight: '60%',
+    backgroundColor: '#1e293b',
+    borderRadius: 20,
+    padding: 20,
+    borderWidth: 1.5,
+    borderColor: '#e2e8f0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 10,
+  },
+  modalHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#ffffff',
+  },
+  modalScrollContent: {
+    gap: 12,
+  },
+  activeSosListItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#0f172a',
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#334155',
+  },
+  listItemLeft: {
+    flex: 1,
+    marginRight: 10,
+  },
+  victimNameText: {
+    fontSize: 15,
+    fontWeight: 'bold',
+    color: '#ffffff',
+    marginBottom: 2,
+  },
+  victimIncidentDetail: {
+    fontSize: 11,
+    color: '#94a3b8',
+  },
+  listItemHelpBtn: {
+    backgroundColor: '#dc2626',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  listItemHelpBtnText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  noActiveSosText: {
+    color: '#94a3b8',
+    textAlign: 'center',
+    fontStyle: 'italic',
+    paddingVertical: 20,
+  },
+  victimHelpersPanel: {
+    position: 'absolute',
+    top: 170,
+    right: 16,
+    width: 180,
+    maxHeight: 180,
+    backgroundColor: 'rgba(30, 41, 59, 0.95)',
+    borderRadius: 16,
+    padding: 12,
+    borderWidth: 1.5,
+    borderColor: '#22c55e',
+    shadowColor: '#22c55e',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 5,
+    elevation: 6,
+    zIndex: 100,
+  },
+  victimHelpersTitle: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#22c55e',
+    marginBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(34, 197, 94, 0.2)',
+    paddingBottom: 4,
+  },
+  victimHelpersScroll: {
+    flex: 1,
+  },
+  victimHelperRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 8,
+  },
+  helperDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#22c55e',
+  },
+  victimHelperName: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#ffffff',
+  },
+  victimHelperStatus: {
+    fontSize: 9,
+    color: '#94a3b8',
   },
 });

@@ -116,8 +116,16 @@ export const stopBackgroundLocationTracking = async (): Promise<boolean> => {
     const isTaskRunning = await TaskManager.isTaskRegisteredAsync(BACKGROUND_LOCATION_TASK_NAME);
     
     if (isTaskRunning) {
-      await Location.stopLocationUpdatesAsync(BACKGROUND_LOCATION_TASK_NAME);
-      console.log('[Background Location] Background tracking stopped');
+      try {
+        await Location.stopLocationUpdatesAsync(BACKGROUND_LOCATION_TASK_NAME);
+        console.log('[Background Location] Background tracking stopped');
+      } catch (error: any) {
+        if (error.message?.includes('TaskNotFoundException') || error.message?.includes('not found')) {
+          console.log('[Background Location] Background tracking was not active (TaskNotFoundException ignored)');
+        } else {
+          throw error;
+        }
+      }
     }
     
     return true;
@@ -139,6 +147,10 @@ export const isBackgroundLocationTrackingActive = async (): Promise<boolean> => 
   }
 };
 
+// Persistent trackers for danger zone checks
+const lastDistanceToZone = new Map<string, number>();
+const lastNotificationTime = new Map<string, number>();
+
 /**
  * Check user location against all danger zones and send notifications
  */
@@ -152,22 +164,37 @@ export const checkDangerZonesForLocation = async (
 
     // Check each danger zone
     for (const zone of dangerZones) {
-      const isInDanger = checkIfInDangerZone(
-        userLat,
-        userLon,
-        zone.center.latitude,
-        zone.center.longitude,
-        zone.radius
-      );
+      const distance = getDistance(userLat, userLon, zone.center.latitude, zone.center.longitude);
+      const isInDanger = distance <= zone.radius;
 
       if (isInDanger) {
-        // Calculate distance to zone center
-        const distance = getDistance(userLat, userLon, zone.center.latitude, zone.center.longitude);
-        
-        // Send notification
-        await sendDangerZoneNotification(zone, distance);
-        
+        // Determine approach direction
+        const prevDistance = lastDistanceToZone.get(zone.id);
+        const isApproaching = prevDistance === undefined || distance < prevDistance;
+
+        // Save current distance
+        lastDistanceToZone.set(zone.id, distance);
+
+        // Enforce 1-minute cooldown check (60000ms)
+        const lastNotified = lastNotificationTime.get(zone.id) || 0;
+        const now = Date.now();
+        const hasPassedOneMinute = now - lastNotified >= 60000;
+
+        if (isApproaching && hasPassedOneMinute) {
+          lastNotificationTime.set(zone.id, now);
+          
+          // Send notification
+          await sendDangerZoneNotification(zone, distance, isApproaching);
+          
+          // Record notification in store to prevent notification spam across other handlers
+          useAppStore.getState().recordDangerZoneNotification(zone.id);
+        }
+
         return zone;
+      } else {
+        // Reset tracking state if user leaves this specific danger zone
+        lastDistanceToZone.delete(zone.id);
+        lastNotificationTime.delete(zone.id);
       }
     }
 
@@ -183,7 +210,8 @@ export const checkDangerZonesForLocation = async (
  */
 export const sendDangerZoneNotification = async (
   zone: DangerZone,
-  distance: number
+  distance: number,
+  isApproaching?: boolean
 ): Promise<string> => {
   const severityEmoji = {
     low: '⚠️',
@@ -193,9 +221,10 @@ export const sendDangerZoneNotification = async (
   };
 
   const emoji = severityEmoji[zone.severity] || '⚠️';
+  const prefix = isApproaching ? 'Approaching Danger! ' : '';
 
   const notificationId = await scheduleLocalNotification({
-    title: `${emoji} Danger Zone Alert`,
+    title: `${emoji} ${prefix}Danger Zone Alert`,
     body: `You are ${distance.toFixed(2)}km from a ${zone.severity} danger zone (${zone.type}). ${distance < 1 ? 'Tap to request help.' : ''}`,
     data: {
       type: 'danger_zone',

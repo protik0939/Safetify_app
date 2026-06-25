@@ -2,6 +2,7 @@ import { AppColors, lastSectionStyle } from "@/constants/theme";
 import { Ionicons } from "@expo/vector-icons";
 import { format } from "date-fns";
 import React, { useEffect, useRef, useState } from "react";
+import { router, useLocalSearchParams } from "expo-router";
 import {
   ActivityIndicator,
   Alert,
@@ -20,6 +21,7 @@ import type { IncidentDetail } from "../../types";
 import {
   createIncident,
   getAllIncidents,
+  getIncidentById,
   updateIncident,
   deleteIncident,
   type IncidentRecord,
@@ -82,6 +84,7 @@ export default function IncidentsScreen() {
   const [timingOpen, setTimingOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [editTimingOpen, setEditTimingOpen] = useState(false);
+  const { viewIncidentId } = useLocalSearchParams<{ viewIncidentId?: string }>();
 
   // Fetch/reload incidents when user is not in active SOS mode
   useEffect(() => {
@@ -89,6 +92,28 @@ export default function IncidentsScreen() {
       loadIncidents();
     }
   }, [isSOSActive]);
+
+  // Effect: Auto-select an incident if viewIncidentId search parameter is passed
+  useEffect(() => {
+    if (viewIncidentId) {
+      const found = incidents.find((i) => i.id === viewIncidentId);
+      if (found) {
+        setSelectedIncident(found);
+      } else {
+        const fetchAndSelect = async () => {
+          try {
+            const data = await getIncidentById(viewIncidentId);
+            if (data) {
+              setSelectedIncident(mapRecordToDetail(data));
+            }
+          } catch (err) {
+            console.warn("Failed to fetch specific incident details:", err);
+          }
+        };
+        fetchAndSelect();
+      }
+    }
+  }, [viewIncidentId, incidents]);
 
   // Back button interception for Android hardware back button
   useEffect(() => {
@@ -470,19 +495,27 @@ export default function IncidentsScreen() {
         <ScrollView style={styles.content}>
           <View style={lastSectionStyle}>
             <View style={styles.detailCard}>
-              <View
-                style={[
-                  styles.severityBadge,
-                  {
-                    backgroundColor: getSeverityColor(
-                      selectedIncident.severity,
-                    ),
-                  },
-                ]}
-              >
-                <Text style={styles.severityText}>
-                  {selectedIncident.severity.toUpperCase()}
-                </Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+                <View
+                  style={[
+                    styles.severityBadge,
+                    {
+                      backgroundColor: getSeverityColor(
+                        selectedIncident.severity,
+                      ),
+                    },
+                  ]}
+                >
+                  <Text style={styles.severityText}>
+                    {selectedIncident.severity.toUpperCase()}
+                  </Text>
+                </View>
+                {selectedIncident.title?.toLowerCase().includes('sos') && (
+                  <View style={styles.sosLiveIndicator}>
+                    <View style={styles.sosLiveDot} />
+                    <Text style={styles.sosLiveText}>LIVE SOS</Text>
+                  </View>
+                )}
               </View>
 
               <Text style={styles.detailTitle}>{selectedIncident.title}</Text>
@@ -495,6 +528,22 @@ export default function IncidentsScreen() {
               <Text style={styles.detailDescription}>
                 {selectedIncident.description}
               </Text>
+
+              {selectedIncident.title?.toLowerCase().includes('sos') && (
+                <TouchableOpacity
+                  style={styles.goHelpBtn}
+                  onPress={() => {
+                    setSelectedIncident(null);
+                    router.navigate({
+                      pathname: "/",
+                      params: { incidentId: selectedIncident.id }
+                    });
+                  }}
+                >
+                  <Ionicons name="shield-checkmark" size={18} color="#fff" />
+                  <Text style={styles.goHelpBtnText}>Go to Help</Text>
+                </TouchableOpacity>
+              )}
 
               <View style={styles.statsGrid}>
                 <View style={styles.statBox}>
@@ -896,15 +945,24 @@ export default function IncidentsScreen() {
                 style={styles.incidentCard}
                 onPress={() => setSelectedIncident(incident)}
               >
-                <View
-                  style={[
-                    styles.severityBadge,
-                    { backgroundColor: getSeverityColor(incident.severity) },
-                  ]}
-                >
-                  <Text style={styles.severityText}>
-                    {incident.severity.toUpperCase()}
-                  </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                  <View
+                    style={[
+                      styles.severityBadge,
+                      { backgroundColor: getSeverityColor(incident.severity) },
+                    ]}
+                  >
+                    <Text style={styles.severityText}>
+                      {incident.severity.toUpperCase()}
+                    </Text>
+                  </View>
+
+                  {incident.title?.toLowerCase().includes('sos') && (
+                    <View style={styles.cardSosBadge}>
+                      <View style={styles.sosLiveDot} />
+                      <Text style={styles.cardSosBadgeText}>LIVE SOS</Text>
+                    </View>
+                  )}
                 </View>
 
                 <Text style={incident.userId === user?.id ? [styles.incidentTitle, { color: AppColors.themeColor }] : styles.incidentTitle}>
@@ -943,6 +1001,22 @@ export default function IncidentsScreen() {
                     {incident.peopleHelped}
                   </Text>
                 </View>
+
+                {incident.title?.toLowerCase().includes('sos') && (
+                  <TouchableOpacity
+                    style={styles.cardGoHelpBtn}
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      router.navigate({
+                        pathname: "/",
+                        params: { incidentId: incident.id }
+                      });
+                    }}
+                  >
+                    <Ionicons name="shield-checkmark" size={14} color="#fff" />
+                    <Text style={styles.cardGoHelpBtnText}>Go to Help</Text>
+                  </TouchableOpacity>
+                )}
 
                 {incident.userId === user?.id && (
                   <View style={styles.cardActionRow}>
@@ -1738,5 +1812,80 @@ const styles = StyleSheet.create({
     color: AppColors.muted,
     fontSize: 14,
     fontStyle: "italic",
+  },
+  sosLiveIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    borderWidth: 1,
+    borderColor: '#ef4444',
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    alignSelf: 'flex-start',
+    gap: 6,
+  },
+  sosLiveDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#ef4444',
+  },
+  sosLiveText: {
+    color: '#ef4444',
+    fontSize: 11,
+    fontWeight: 'bold',
+    letterSpacing: 0.5,
+  },
+  goHelpBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#dc2626',
+    borderRadius: 12,
+    paddingVertical: 14,
+    marginTop: 16,
+    gap: 8,
+    shadowColor: '#dc2626',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  goHelpBtnText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  cardSosBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    borderWidth: 1,
+    borderColor: '#ef4444',
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    gap: 4,
+  },
+  cardSosBadgeText: {
+    color: '#ef4444',
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
+  cardGoHelpBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#dc2626',
+    borderRadius: 8,
+    paddingVertical: 8,
+    marginTop: 12,
+    gap: 6,
+  },
+  cardGoHelpBtnText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: 'bold',
   },
 });
