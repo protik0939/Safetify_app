@@ -47,10 +47,10 @@ export async function scheduleLocalNotification(options: {
       body,
       data,
       badge,
-      sound: "default",
+      sound: "alert.mp3",
       // Android-specific channel (must match the channel created in the hook)
       // @ts-ignore – channelId is an Android-only field
-      channelId: "safetify-alerts",
+      channelId: "safetify-alerts-v3",
     },
     trigger,
   });

@@ -158,7 +158,7 @@ async function registerForPushNotificationsAsync(
 
   // Android: create a notification channel (required for Android 8+)
   if (Platform.OS === "android") {
-    await Notifications.setNotificationChannelAsync("safetify-alerts", {
+    await Notifications.setNotificationChannelAsync("safetify-alerts-v3", {
       name: "Safetify Alerts",
       importance: Notifications.AndroidImportance.MAX,
       vibrationPattern: [0, 250, 250, 250],
