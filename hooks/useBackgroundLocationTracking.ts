@@ -6,7 +6,7 @@
  */
 
 import * as Location from 'expo-location';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAppStore } from '../store/useAppStore';
 import {
     checkDangerZonesForLocation,
@@ -36,8 +36,9 @@ export const useBackgroundLocationTracking = (
   const [error, setError] = useState<string | null>(null);
   const [lastLocationUpdate, setLastLocationUpdate] = useState<Date | null>(null);
 
-  const { dangerZones, setCurrentLocation } = useAppStore();
-  let foregroundSubscription: Location.LocationSubscription | null = null;
+  const dangerZones = useAppStore((s) => s.dangerZones);
+  const setCurrentLocation = useAppStore((s) => s.setCurrentLocation);
+  const foregroundSubscriptionRef = useRef<Location.LocationSubscription | null>(null);
 
   // Initialize background task on mount
   useEffect(() => {
@@ -77,7 +78,7 @@ export const useBackgroundLocationTracking = (
       }
 
       // Also watch location in foreground for real-time updates
-      foregroundSubscription = await watchLocation((location) => {
+      foregroundSubscriptionRef.current = await watchLocation((location) => {
         setCurrentLocation({
           latitude: location.coords.latitude,
           longitude: location.coords.longitude,
@@ -120,9 +121,9 @@ export const useBackgroundLocationTracking = (
   const stopTracking = useCallback(async () => {
     try {
       // Stop foreground subscription
-      if (foregroundSubscription) {
-        foregroundSubscription.remove();
-        foregroundSubscription = null;
+      if (foregroundSubscriptionRef.current) {
+        foregroundSubscriptionRef.current.remove();
+        foregroundSubscriptionRef.current = null;
       }
 
       // Stop background tracking

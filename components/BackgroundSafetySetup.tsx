@@ -218,7 +218,7 @@ export function BackgroundSafetySetup() {
           • Your location is tracked every 30 seconds in the background
         </Text>
         <Text style={styles.infoText}>
-          • When you enter a danger zone, you'll receive a notification
+          • When you enter a danger zone, you&apos;ll receive a notification
         </Text>
         <Text style={styles.infoText}>
           • Tap the notification to send an SOS alert to nearby responders

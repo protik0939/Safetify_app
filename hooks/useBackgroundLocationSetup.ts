@@ -6,7 +6,7 @@
  */
 
 import * as Notifications from 'expo-notifications';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useMemo } from 'react';
 import { useAppStore } from '../store/useAppStore';
 import {
     handleNotificationAction,
@@ -54,24 +54,22 @@ export const useBackgroundLocationSetup = (
   const [setupError, setSetupError] = useState<string | null>(null);
   const notificationResponseListener = useRef<{ remove(): void } | null>(null);
 
-  const {
-    dangerZones,
-    setBackgroundTrackingEnabled,
-    recordDangerZoneNotification,
-    lastDangerZoneNotificationTime,
-    isBackgroundTrackingEnabled,
-  } = useAppStore();
+  const dangerZones = useAppStore((s) => s.dangerZones);
+  const setBackgroundTrackingEnabled = useAppStore((s) => s.setBackgroundTrackingEnabled);
+  const recordDangerZoneNotification = useAppStore((s) => s.recordDangerZoneNotification);
+  const lastDangerZoneNotificationTime = useAppStore((s) => s.lastDangerZoneNotificationTime);
+  const isBackgroundTrackingEnabled = useAppStore((s) => s.isBackgroundTrackingEnabled);
 
-  // Initialize location tracking and notifications
-  const locationTracking = useBackgroundLocationTracking({
+  // Memoize location tracking options to avoid recreation on every render
+  const trackingOptions = useMemo(() => ({
     enabled,
-    onDangerZoneEnter: (message) => {
+    onDangerZoneEnter: (message: string) => {
       console.log('[Background Setup] Danger zone alert:', message);
       if (onDangerZoneEnter) {
         onDangerZoneEnter(message, 'high');
       }
     },
-    onLocationUpdate: async (location) => {
+    onLocationUpdate: async (location: any) => {
       const currentUser = useAppStore.getState().user;
       if (currentUser) {
         try {
@@ -93,7 +91,10 @@ export const useBackgroundLocationSetup = (
         }
       }
     }
-  });
+  }), [enabled, onDangerZoneEnter]);
+
+  // Initialize location tracking and notifications
+  const locationTracking = useBackgroundLocationTracking(trackingOptions);
 
   const notificationState = usePushNotifications();
 

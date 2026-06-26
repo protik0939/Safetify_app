@@ -6,6 +6,7 @@ import Toast from '@/components/AppToast';
 import { useAppStore } from '../store/useAppStore';
 import { generateMockSOSRequest } from '../utils/mockData';
 import { createIncident, updateIncident, getIncidentById } from '../utils/incidentApi';
+import { pickImages, takePhoto, compressImage, uploadToImgBB } from '../utils/imageUpload';
 
 const getTimingFromDate = (date: Date): string => {
   const hour = date.getHours();
@@ -43,6 +44,7 @@ export default function SOSButton() {
   const [isRecording, setIsRecording] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [sendingMessage, setSendingMessage] = useState(false);
+  const [isUploadingSOSImage, setIsUploadingSOSImage] = useState(false);
   const [micPermissionGranted, setMicPermissionGranted] = useState<boolean | null>(null);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
 
@@ -331,6 +333,77 @@ export default function SOSButton() {
     }
   };
 
+  const processAndUploadSOSImage = async (uri: string) => {
+    if (!activeSOSIncidentId) return;
+    setIsUploadingSOSImage(true);
+    try {
+      const compressed = await compressImage(uri);
+      const url = await uploadToImgBB(compressed);
+
+      // Fetch current incident to preserve existing images
+      const incident = await getIncidentById(activeSOSIncidentId);
+      const existingImages = incident.images?.filter(img => !img.helperValidationId).map(i => i.url) || [];
+      const updatedImages = [...existingImages, url];
+
+      // Update incident with new images list
+      await updateIncident(activeSOSIncidentId, {
+        images: updatedImages
+      });
+
+      Toast.show({
+        type: 'success',
+        text1: 'Image Uploaded',
+        text2: 'Emergency incident image uploaded successfully.',
+      });
+    } catch (err: any) {
+      console.error("Failed to upload SOS incident image:", err);
+      Alert.alert("Error", err.message || "Failed to upload image. Please try again.");
+    } finally {
+      setIsUploadingSOSImage(false);
+    }
+  };
+
+  const handleSOSImageUpload = async () => {
+    if (!activeSOSIncidentId) {
+      Alert.alert("Error", "No active SOS request found.");
+      return;
+    }
+
+    Alert.alert(
+      "Upload Image",
+      "Upload a photo to show your current emergency details",
+      [
+        {
+          text: "Take Photo",
+          onPress: async () => {
+            try {
+              const uri = await takePhoto();
+              if (!uri) return;
+              await processAndUploadSOSImage(uri);
+            } catch (err: any) {
+              console.error(err);
+              Alert.alert("Error", err.message || "Failed to take photo.");
+            }
+          }
+        },
+        {
+          text: "Choose from Gallery",
+          onPress: async () => {
+            try {
+              const selectedUris = await pickImages(false);
+              if (selectedUris.length === 0) return;
+              await processAndUploadSOSImage(selectedUris[0]);
+            } catch (err: any) {
+              console.error(err);
+              Alert.alert("Error", err.message || "Failed to pick image.");
+            }
+          }
+        },
+        { text: "Cancel", style: "cancel" }
+      ]
+    );
+  };
+
   const sendMessage = async () => {
     if (!messageText.trim() || !activeSOSIncidentId) return;
     setSendingMessage(true);
@@ -509,9 +582,20 @@ export default function SOSButton() {
                     editable={!sendingMessage}
                   />
                   <TouchableOpacity
+                    style={styles.cameraButton}
+                    onPress={handleSOSImageUpload}
+                    disabled={sendingMessage || isUploadingSOSImage}
+                  >
+                    {isUploadingSOSImage ? (
+                      <ActivityIndicator size="small" color="#fff" />
+                    ) : (
+                      <Ionicons name="camera" size={20} color="#fff" />
+                    )}
+                  </TouchableOpacity>
+                  <TouchableOpacity
                     style={styles.micButton}
                     onPress={handleMicPress}
-                    disabled={sendingMessage}
+                    disabled={sendingMessage || isUploadingSOSImage}
                   >
                     <Ionicons name="mic" size={20} color="#fff" />
                   </TouchableOpacity>
@@ -754,6 +838,14 @@ const styles = StyleSheet.create({
     height: 38,
     borderRadius: 19,
     backgroundColor: '#f09129',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  cameraButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#3b82f6',
     justifyContent: 'center',
     alignItems: 'center',
   },

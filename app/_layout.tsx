@@ -4,7 +4,7 @@ import Toast from "@/components/AppToast";
 import { Stack, router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useState, useCallback } from "react";
-import { Alert, Modal, View, Text, TextInput, TouchableOpacity, ActivityIndicator, StyleSheet } from "react-native";
+import { Alert, Modal, View, Text, TextInput, TouchableOpacity, ActivityIndicator, StyleSheet, Platform } from "react-native";
 import "react-native-reanimated";
 import { getAllIncidents } from "@/utils/incidentApi";
 import { sendOTP, verifyOTP, clearSessionToken } from "@/utils/authApi";
@@ -14,14 +14,9 @@ export const unstable_settings = {
   initialRouteName: "index",
 };
 
-/**
- * RootLayout is the top-level component for the entire app.
- * We initialise push notifications here so the listeners are active for the
- * whole session – including when the app is opened via a notification tap.
- */
-export default function RootLayout() {
+function BackgroundLocationSetupManager() {
   const user = useAppStore((s) => s.user);
-  const setup = useBackgroundLocationSetup({ enabled: !!user });
+  const setup = useBackgroundLocationSetup({ enabled: !!user && user.emailVerified });
   const { expoPushToken, notification, error } = setup.notificationState;
 
   const addNotification = useAppStore((s) => s.addNotification);
@@ -100,7 +95,16 @@ export default function RootLayout() {
       });
     }
   }, [user, expoPushToken, error]);
-  
+
+  return null;
+}
+
+/**
+ * RootLayout is the top-level component for the entire app.
+ * We initialise push notifications here so the listeners are active for the
+ * whole session – including when the app is opened via a notification tap.
+ */
+export default function RootLayout() {
   const isAuthenticated = useAppStore((s) => s.isAuthenticated);
   const setCachedIncidents = useAppStore((s) => s.setCachedIncidents);
   const setDangerZones = useAppStore((s) => s.setDangerZones);
@@ -176,6 +180,7 @@ export default function RootLayout() {
       <StatusBar style="dark" backgroundColor="#f09129" translucent={false} />
       <Toast />
       <EmailVerificationModal />
+      <BackgroundLocationSetupManager />
     </>
   );
 }
@@ -193,6 +198,17 @@ function EmailVerificationModal() {
   const [successMessage, setSuccessMessage] = useState("");
 
   const visible = isAuthenticated && user && !user.emailVerified;
+
+  // Reset modal state when user changes or modal becomes visible
+  useEffect(() => {
+    if (visible) {
+      setOtpSent(false);
+      setOtp("");
+      setErrorMessage("");
+      setSuccessMessage("");
+      setIsLoading(false);
+    }
+  }, [user?.id, visible]);
 
   const handleSendEmail = async () => {
     if (!user?.email) return;

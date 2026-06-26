@@ -25,6 +25,7 @@ export interface IncidentPayload {
   peopleHelped?: number;
   stories?: string[];
   status?: string;
+  images?: string[];
 }
 
 export interface IncidentRecord {
@@ -61,6 +62,29 @@ export interface IncidentRecord {
       email: string;
     };
   }>;
+  images?: Array<{
+    id: string;
+    url: string;
+    helperValidationId: string | null;
+  }>;
+  helperValidations?: Array<{
+    id: string;
+    responderId: string;
+    isTrue: boolean;
+    comment: string | null;
+    createdAt: string;
+    responder: {
+      id: string;
+      name: string;
+      email: string;
+      image: string | null;
+    };
+    images?: Array<{
+      id: string;
+      url: string;
+    }>;
+  }>;
+  truthfulnessPercentage?: number | null;
 }
 
 interface ApiResponse<T> {
@@ -173,3 +197,33 @@ export async function deleteIncident(id: string): Promise<void> {
     method: "DELETE",
   });
 }
+
+/** Abort incident response (remove responder from SOS). */
+export async function abortIncidentResponse(
+  incidentId: string,
+  responderId: string,
+): Promise<void> {
+  return apiFetch<void>(`/incidents/${incidentId}/abort`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ responderId }),
+  });
+}
+
+/** Submit helper validation (vote True/False with comments and proof images) */
+export async function validateIncident(
+  incidentId: string,
+  payload: {
+    responderId: string;
+    isTrue: boolean;
+    comment?: string;
+    images?: string[];
+  }
+): Promise<IncidentRecord> {
+  return apiFetch<IncidentRecord>(`/incidents/${incidentId}/validate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+}
+

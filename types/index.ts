@@ -122,4 +122,38 @@ export interface IncidentDetail {
   peopleHelped: number;
   timing: string;
   stories: string[];
+  status?: string;
+  images?: Array<{
+    id: string;
+    url: string;
+    helperValidationId: string | null;
+  }>;
+  helperValidations?: Array<{
+    id: string;
+    responderId: string;
+    isTrue: boolean;
+    comment: string | null;
+    createdAt: string;
+    responder: {
+      id: string;
+      name: string;
+      email: string;
+      image: string | null;
+    };
+    images?: Array<{
+      id: string;
+      url: string;
+    }>;
+  }>;
+  truthfulnessPercentage?: number | null;
+  incidentResponders?: Array<{
+    id: string;
+    responderId: string;
+    status: string;
+    responder: {
+      id: string;
+      name: string;
+      email: string;
+    };
+  }>;
 }

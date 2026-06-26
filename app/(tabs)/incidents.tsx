@@ -7,6 +7,7 @@ import {
   ActivityIndicator,
   Alert,
   BackHandler,
+  Image,
   Modal,
   Pressable,
   ScrollView,
@@ -24,9 +25,11 @@ import {
   getIncidentById,
   updateIncident,
   deleteIncident,
+  validateIncident,
   type IncidentRecord,
 } from "../../utils/incidentApi";
 import { useAppStore } from "../../store/useAppStore";
+import { pickImages, takePhoto, compressImage, uploadToImgBB } from "../../utils/imageUpload";
 
 export default function IncidentsScreen() {
   const user = useAppStore((s) => s.user);
@@ -59,6 +62,7 @@ export default function IncidentsScreen() {
     latitude: "",
     longitude: "",
     timing: "",
+    images: [] as string[],
   });
 
   // Edit form state
@@ -75,7 +79,17 @@ export default function IncidentsScreen() {
     latitude: "",
     longitude: "",
     timing: "",
+    images: [] as string[],
   });
+
+  // Helper validation form state
+  const [valIsTrue, setValIsTrue] = useState<boolean | null>(null);
+  const [valComment, setValComment] = useState("");
+  const [valImages, setValImages] = useState<string[]>([]);
+  const [isSubmittingValidation, setIsSubmittingValidation] = useState(false);
+  const [isUploadingImages, setIsUploadingImages] = useState(false);
+  const [isUploadingValImages, setIsUploadingValImages] = useState(false);
+  const [fullscreenImage, setFullscreenImage] = useState<string | null>(null);
 
   const mapWebViewRef = useRef<WebView>(null);
   const editMapWebViewRef = useRef<WebView>(null);
@@ -160,6 +174,11 @@ export default function IncidentsScreen() {
     peopleHelped: record.peopleHelped ?? 0,
     timing: record.timing ?? "Unknown",
     stories: record.stories ?? [],
+    status: record.status ?? undefined,
+    images: record.images,
+    helperValidations: record.helperValidations,
+    truthfulnessPercentage: record.truthfulnessPercentage,
+    incidentResponders: record.incidentResponders,
   });
 
   const loadIncidents = async () => {
@@ -210,6 +229,201 @@ export default function IncidentsScreen() {
     }
   };
 
+  const handleAddImages = async (isEdit = false) => {
+    Alert.alert(
+      "Add Images",
+      "Choose a source for your images",
+      [
+        {
+          text: "Take Photo",
+          onPress: async () => {
+            try {
+              const uri = await takePhoto();
+              if (!uri) return;
+
+              setIsUploadingImages(true);
+              const compressed = await compressImage(uri);
+              const url = await uploadToImgBB(compressed);
+
+              if (isEdit) {
+                setEditForm(prev => ({
+                  ...prev,
+                  images: [...prev.images, url]
+                }));
+              } else {
+                setNewIncident(prev => ({
+                  ...prev,
+                  images: [...prev.images, url]
+                }));
+              }
+              Alert.alert("Success", "Photo uploaded successfully.");
+            } catch (err: any) {
+              console.error(err);
+              Alert.alert("Error", err.message || "Failed to take photo.");
+            } finally {
+              setIsUploadingImages(false);
+            }
+          }
+        },
+        {
+          text: "Choose from Gallery",
+          onPress: async () => {
+            try {
+              const selectedUris = await pickImages(true);
+              if (selectedUris.length === 0) return;
+
+              setIsUploadingImages(true);
+              const uploadedUrls: string[] = [];
+
+              for (const uri of selectedUris) {
+                const compressed = await compressImage(uri);
+                const url = await uploadToImgBB(compressed);
+                uploadedUrls.push(url);
+              }
+
+              if (isEdit) {
+                setEditForm(prev => ({
+                  ...prev,
+                  images: [...prev.images, ...uploadedUrls]
+                }));
+              } else {
+                setNewIncident(prev => ({
+                  ...prev,
+                  images: [...prev.images, ...uploadedUrls]
+                }));
+              }
+              Alert.alert("Success", "Images uploaded successfully.");
+            } catch (err: any) {
+              console.error(err);
+              Alert.alert("Error", err.message || "Failed to upload images.");
+            } finally {
+              setIsUploadingImages(false);
+            }
+          }
+        },
+        { text: "Cancel", style: "cancel" }
+      ]
+    );
+  };
+
+  const handleRemoveImage = (index: number, isEdit = false) => {
+    if (isEdit) {
+      setEditForm(prev => ({
+        ...prev,
+        images: prev.images.filter((_, i) => i !== index)
+      }));
+    } else {
+      setNewIncident(prev => ({
+        ...prev,
+        images: prev.images.filter((_, i) => i !== index)
+      }));
+    }
+  };
+
+  const handleValidateIncident = async () => {
+    if (!selectedIncident) return;
+    if (valIsTrue === null) {
+      Alert.alert("Required Choice", "Please click True or False to verify the incident.");
+      return;
+    }
+    if (!user?.id) {
+      Alert.alert("Error", "You must be logged in to submit a verification.");
+      return;
+    }
+
+    setIsSubmittingValidation(true);
+    try {
+      const payload = {
+        responderId: user.id,
+        isTrue: valIsTrue,
+        comment: valComment.trim() || undefined,
+        images: valImages,
+      };
+
+      const updated = await validateIncident(selectedIncident.id, payload);
+      const mapped = mapRecordToDetail(updated);
+
+      // Update in lists
+      setIncidents((prev) =>
+        prev.map((inc) => (inc.id === selectedIncident.id ? mapped : inc))
+      );
+      setSelectedIncident(mapped);
+
+      // Reset validation form state
+      setValIsTrue(null);
+      setValComment("");
+      setValImages([]);
+
+      Alert.alert("Success", "Incident verification submitted successfully.");
+    } catch (err: any) {
+      console.error("Failed to submit verification:", err);
+      Alert.alert("Error", err.message || "Failed to submit verification.");
+    } finally {
+      setIsSubmittingValidation(false);
+    }
+  };
+
+  const handleAddValImages = async () => {
+    Alert.alert(
+      "Add Verification Images",
+      "Choose a source for your proof images",
+      [
+        {
+          text: "Take Photo",
+          onPress: async () => {
+            try {
+              const uri = await takePhoto();
+              if (!uri) return;
+
+              setIsUploadingValImages(true);
+              const compressed = await compressImage(uri);
+              const url = await uploadToImgBB(compressed);
+
+              setValImages(prev => [...prev, url]);
+              Alert.alert("Success", "Verification photo uploaded successfully.");
+            } catch (err: any) {
+              console.error(err);
+              Alert.alert("Error", err.message || "Failed to take photo.");
+            } finally {
+              setIsUploadingValImages(false);
+            }
+          }
+        },
+        {
+          text: "Choose from Gallery",
+          onPress: async () => {
+            try {
+              const selectedUris = await pickImages(true);
+              if (selectedUris.length === 0) return;
+
+              setIsUploadingValImages(true);
+              const uploadedUrls: string[] = [];
+
+              for (const uri of selectedUris) {
+                const compressed = await compressImage(uri);
+                const url = await uploadToImgBB(compressed);
+                uploadedUrls.push(url);
+              }
+
+              setValImages(prev => [...prev, ...uploadedUrls]);
+              Alert.alert("Success", "Proof images uploaded successfully.");
+            } catch (err: any) {
+              console.error(err);
+              Alert.alert("Error", err.message || "Failed to upload images.");
+            } finally {
+              setIsUploadingValImages(false);
+            }
+          }
+        },
+        { text: "Cancel", style: "cancel" }
+      ]
+    );
+  };
+
+  const handleRemoveValImage = (index: number) => {
+    setValImages(prev => prev.filter((_, i) => i !== index));
+  };
+
   const resetForm = () => {
     setNewIncident({
       title: "",
@@ -223,6 +437,7 @@ export default function IncidentsScreen() {
       latitude: "",
       longitude: "",
       timing: "",
+      images: [],
     });
   };
 
@@ -345,6 +560,7 @@ export default function IncidentsScreen() {
         injuryCount: Number.parseInt(newIncident.injuryCount, 10) || 0,
         peopleHelped: Number.parseInt(newIncident.peopleHelped, 10) || 0,
         stories: [],
+        images: newIncident.images,
       };
 
       const created = await createIncident(payload);
@@ -387,6 +603,7 @@ export default function IncidentsScreen() {
       latitude: String(incident.location.latitude),
       longitude: String(incident.location.longitude),
       timing: incident.timing,
+      images: incident.images?.map((i) => i.url) || [],
     });
   };
 
@@ -414,6 +631,7 @@ export default function IncidentsScreen() {
         deathToll: Number.parseInt(editForm.deathToll, 10) || 0,
         injuryCount: Number.parseInt(editForm.injuryCount, 10) || 0,
         peopleHelped: Number.parseInt(editForm.peopleHelped, 10) || 0,
+        images: editForm.images,
       };
 
       const updated = await updateIncident(editingIncident.id, payload);
@@ -495,7 +713,7 @@ export default function IncidentsScreen() {
         <ScrollView style={styles.content}>
           <View style={lastSectionStyle}>
             <View style={styles.detailCard}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8, flexWrap: 'wrap' }}>
                 <View
                   style={[
                     styles.severityBadge,
@@ -510,10 +728,28 @@ export default function IncidentsScreen() {
                     {selectedIncident.severity.toUpperCase()}
                   </Text>
                 </View>
-                {selectedIncident.title?.toLowerCase().includes('sos') && (
+                {selectedIncident.title?.toLowerCase().includes('sos') && selectedIncident.status !== 'resolved' && (
                   <View style={styles.sosLiveIndicator}>
                     <View style={styles.sosLiveDot} />
                     <Text style={styles.sosLiveText}>LIVE SOS</Text>
+                  </View>
+                )}
+                {selectedIncident.truthfulnessPercentage !== null && selectedIncident.truthfulnessPercentage !== undefined && (
+                  <View
+                    style={[
+                      styles.truthBadge,
+                      {
+                        backgroundColor:
+                          selectedIncident.truthfulnessPercentage >= 80
+                            ? "#15803d"
+                            : selectedIncident.truthfulnessPercentage >= 50
+                            ? "#c2410c"
+                            : "#b91c1c",
+                      },
+                    ]}
+                  >
+                    <Ionicons name="checkmark-circle-outline" size={12} color="#fff" />
+                    <Text style={styles.truthBadgeText}>{selectedIncident.truthfulnessPercentage}% True</Text>
                   </View>
                 )}
               </View>
@@ -523,13 +759,27 @@ export default function IncidentsScreen() {
                 {format(selectedIncident.date, "MMM dd, yyyy - hh:mm a")}
               </Text>
 
+              {/* Incident Images Gallery */}
+              {selectedIncident.images && selectedIncident.images.filter(img => !img.helperValidationId).length > 0 && (
+                <View style={styles.gallerySection}>
+                  <Text style={styles.galleryTitle}>Incident Media</Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.galleryScroll}>
+                    {selectedIncident.images.filter(img => !img.helperValidationId).map((img, idx) => (
+                      <TouchableOpacity key={idx} onPress={() => setFullscreenImage(img.url)}>
+                        <Image source={{ uri: img.url }} style={styles.galleryImage} />
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                </View>
+              )}
+
               <View style={styles.divider} />
 
               <Text style={styles.detailDescription}>
                 {selectedIncident.description}
               </Text>
 
-              {selectedIncident.title?.toLowerCase().includes('sos') && (
+              {selectedIncident.title?.toLowerCase().includes('sos') && selectedIncident.status !== 'resolved' && (
                 <TouchableOpacity
                   style={styles.goHelpBtn}
                   onPress={() => {
@@ -544,6 +794,20 @@ export default function IncidentsScreen() {
                   <Text style={styles.goHelpBtnText}>Go to Help</Text>
                 </TouchableOpacity>
               )}
+
+              <TouchableOpacity
+                style={[styles.goHelpBtn, { backgroundColor: '#3b82f6', marginTop: 8 }]}
+                onPress={() => {
+                  setSelectedIncident(null);
+                  router.navigate({
+                    pathname: "/",
+                    params: { focusIncidentId: selectedIncident.id }
+                  });
+                }}
+              >
+                <Ionicons name="map" size={18} color="#fff" />
+                <Text style={styles.goHelpBtnText}>Show on Map</Text>
+              </TouchableOpacity>
 
               <View style={styles.statsGrid}>
                 <View style={styles.statBox}>
@@ -594,9 +858,171 @@ export default function IncidentsScreen() {
                   <Text style={styles.storyText}>{story}</Text>
                 </View>
               ))}
+
+              {/* HELPER VERIFICATION PANEL */}
+              {user && selectedIncident.incidentResponders?.some(r => r.responderId === user.id) && (
+                <View style={styles.valPanel}>
+                  <View style={styles.valPanelHeader}>
+                    <Ionicons name="shield-checkmark" size={18} color={AppColors.themeColor} />
+                    <Text style={styles.valPanelTitle}>Verify This Incident</Text>
+                  </View>
+                  <Text style={styles.valPanelSubtitle}>As a responder going to help, is this SOS real?</Text>
+
+                  <View style={styles.valVoteRow}>
+                    <TouchableOpacity
+                      style={[
+                        styles.valVoteBtn,
+                        styles.valVoteTrue,
+                        valIsTrue === true && styles.valVoteTrueActive
+                      ]}
+                      onPress={() => setValIsTrue(true)}
+                    >
+                      <Ionicons name="checkmark-circle" size={18} color="#fff" />
+                      <Text style={styles.valVoteBtnText}>TRUE SOS</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[
+                        styles.valVoteBtn,
+                        styles.valVoteFalse,
+                        valIsTrue === false && styles.valVoteFalseActive
+                      ]}
+                      onPress={() => setValIsTrue(false)}
+                    >
+                      <Ionicons name="close-circle" size={18} color="#fff" />
+                      <Text style={styles.valVoteBtnText}>FALSE ALARM</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  <TextInput
+                    style={styles.valCommentInput}
+                    value={valComment}
+                    onChangeText={setValComment}
+                    placeholder="Describe what you see / verify at the location..."
+                    placeholderTextColor="#94a3b8"
+                    multiline
+                    numberOfLines={3}
+                  />
+
+                  {/* Proof Images Section */}
+                  <View style={styles.valImageSection}>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.imageScroll}>
+                      {valImages.map((url, idx) => (
+                        <View key={idx} style={styles.imageWrapper}>
+                          <Image source={{ uri: url }} style={styles.uploadedThumbnail} />
+                          <TouchableOpacity
+                            style={styles.removeImageBtn}
+                            onPress={() => handleRemoveValImage(idx)}
+                          >
+                            <Ionicons name="close-circle" size={18} color="#dc2626" />
+                          </TouchableOpacity>
+                        </View>
+                      ))}
+                      {isUploadingValImages && (
+                        <View style={[styles.imageWrapper, styles.imagePlaceholder]}>
+                          <ActivityIndicator size="small" color={AppColors.themeColor} />
+                          <Text style={styles.uploadingText}>Uploading...</Text>
+                        </View>
+                      )}
+                      <TouchableOpacity
+                        style={[styles.imageWrapper, styles.addImageBtn]}
+                        onPress={handleAddValImages}
+                        disabled={isUploadingValImages}
+                      >
+                        <Ionicons name="camera" size={20} color={AppColors.themeColor} />
+                        <Text style={styles.addImageText}>Add Proof</Text>
+                      </TouchableOpacity>
+                    </ScrollView>
+                  </View>
+
+                  <TouchableOpacity
+                    style={[styles.valSubmitBtn, isSubmittingValidation && { opacity: 0.6 }]}
+                    onPress={handleValidateIncident}
+                    disabled={isSubmittingValidation || isUploadingValImages}
+                  >
+                    {isSubmittingValidation ? (
+                      <ActivityIndicator size="small" color="#fff" />
+                    ) : (
+                      <Text style={styles.valSubmitBtnText}>Submit Verification Proof</Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              )}
+
+              {/* HELPER VERIFICATIONS FEED LIST */}
+              <View style={styles.valFeedSection}>
+                <Text style={styles.valFeedTitle}>
+                  <Ionicons name="people" size={20} color={AppColors.themeColor} />{" "}
+                  Helper Verifications ({selectedIncident.helperValidations?.length || 0})
+                </Text>
+
+                {(!selectedIncident.helperValidations || selectedIncident.helperValidations.length === 0) ? (
+                  <View style={styles.emptyValFeed}>
+                    <Text style={styles.emptyValText}>No helper verifications submitted yet.</Text>
+                    <Text style={styles.emptyValSubtext}>Responders going for help can verify the status of this incident.</Text>
+                  </View>
+                ) : (
+                  selectedIncident.helperValidations.map((val, idx) => (
+                    <View key={val.id || idx} style={styles.valFeedItem}>
+                      <View style={styles.valFeedItemHeader}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                          <Image
+                            source={val.responder.image ? { uri: val.responder.image } : require('../../assets/images/react-logo.png')}
+                            style={styles.valAvatar}
+                          />
+                          <View>
+                            <Text style={styles.valResponderName}>{val.responder.name}</Text>
+                            <Text style={styles.valResponderEmail}>{val.responder.email}</Text>
+                          </View>
+                        </View>
+                        <View
+                          style={[
+                            styles.feedVoteBadge,
+                            val.isTrue ? styles.feedVoteTrue : styles.feedVoteFalse
+                          ]}
+                        >
+                          <Ionicons name={val.isTrue ? "checkmark-circle" : "close-circle"} size={13} color="#fff" />
+                          <Text style={styles.feedVoteText}>{val.isTrue ? "VERIFIED TRUE" : "FALSE ALARM"}</Text>
+                        </View>
+                      </View>
+
+                      {val.comment ? (
+                        <Text style={styles.valFeedComment}>{val.comment}</Text>
+                      ) : null}
+
+                      {/* Proof Images in Feed */}
+                      {val.images && val.images.length > 0 ? (
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.valFeedImagesScroll}>
+                          {val.images.map((img, iidx) => (
+                            <TouchableOpacity key={img.id || iidx} onPress={() => setFullscreenImage(img.url)}>
+                              <Image source={{ uri: img.url }} style={styles.valFeedProofImage} />
+                            </TouchableOpacity>
+                          ))}
+                        </ScrollView>
+                      ) : null}
+
+                      <Text style={styles.valDateText}>
+                        {format(new Date(val.createdAt), "MMM dd, yyyy - hh:mm a")}
+                      </Text>
+                    </View>
+                  ))
+                )}
+              </View>
+
             </View>
           </View>
         </ScrollView>
+
+        {/* FULLSCREEN IMAGE VIEWER MODAL */}
+        <Modal visible={fullscreenImage !== null} transparent animationType="fade" onRequestClose={() => setFullscreenImage(null)}>
+          <View style={styles.fullscreenBackdrop}>
+            <TouchableOpacity style={styles.fullscreenCloseBtn} onPress={() => setFullscreenImage(null)}>
+              <Ionicons name="close" size={30} color="#fff" />
+            </TouchableOpacity>
+            {fullscreenImage && (
+              <Image source={{ uri: fullscreenImage }} style={styles.fullscreenImage} resizeMode="contain" />
+            )}
+          </View>
+        </Modal>
       </View>
     );
   }
@@ -644,7 +1070,7 @@ export default function IncidentsScreen() {
               onPress={() => setFilter('others')}
             >
               <Text style={[styles.filterChipText, filter === 'others' && styles.filterChipTextActive]}>
-                Other's Incidents
+                Other&apos;s Incidents
               </Text>
             </TouchableOpacity>
           </View>
@@ -850,6 +1276,37 @@ export default function IncidentsScreen() {
                 </View>
               </Modal>
 
+              <View style={styles.imageUploadSection}>
+                <Text style={styles.sectionLabel}>Incident Images</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.imageScroll}>
+                  {newIncident.images.map((url, idx) => (
+                    <View key={idx} style={styles.imageWrapper}>
+                      <Image source={{ uri: url }} style={styles.uploadedThumbnail} />
+                      <TouchableOpacity
+                        style={styles.removeImageBtn}
+                        onPress={() => handleRemoveImage(idx, false)}
+                      >
+                        <Ionicons name="close-circle" size={18} color="#dc2626" />
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                  {isUploadingImages && (
+                    <View style={[styles.imageWrapper, styles.imagePlaceholder]}>
+                      <ActivityIndicator size="small" color={AppColors.themeColor} />
+                      <Text style={styles.uploadingText}>Uploading...</Text>
+                    </View>
+                  )}
+                  <TouchableOpacity
+                    style={[styles.imageWrapper, styles.addImageBtn]}
+                    onPress={() => handleAddImages(false)}
+                    disabled={isUploadingImages}
+                  >
+                    <Ionicons name="camera" size={24} color={AppColors.themeColor} />
+                    <Text style={styles.addImageText}>Add Photos</Text>
+                  </TouchableOpacity>
+                </ScrollView>
+              </View>
+
               <View style={styles.locationSectionHeader}>
                 <Ionicons name="location" size={16} color={AppColors.themeColor} />
                 <Text style={styles.locationSectionTitle}>Incident Location</Text>
@@ -946,18 +1403,39 @@ export default function IncidentsScreen() {
                 onPress={() => setSelectedIncident(incident)}
               >
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                  <View
-                    style={[
-                      styles.severityBadge,
-                      { backgroundColor: getSeverityColor(incident.severity) },
-                    ]}
-                  >
-                    <Text style={styles.severityText}>
-                      {incident.severity.toUpperCase()}
-                    </Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <View
+                      style={[
+                        styles.severityBadge,
+                        { backgroundColor: getSeverityColor(incident.severity) },
+                      ]}
+                    >
+                      <Text style={styles.severityText}>
+                        {incident.severity.toUpperCase()}
+                      </Text>
+                    </View>
+
+                    {incident.truthfulnessPercentage !== null && incident.truthfulnessPercentage !== undefined && (
+                      <View
+                        style={[
+                          styles.truthBadge,
+                          {
+                            backgroundColor:
+                              incident.truthfulnessPercentage >= 80
+                                ? "#15803d"
+                                : incident.truthfulnessPercentage >= 50
+                                ? "#c2410c"
+                                : "#b91c1c",
+                          },
+                        ]}
+                      >
+                        <Ionicons name="checkmark-circle-outline" size={11} color="#fff" />
+                        <Text style={styles.truthBadgeText}>{incident.truthfulnessPercentage}% True</Text>
+                      </View>
+                    )}
                   </View>
 
-                  {incident.title?.toLowerCase().includes('sos') && (
+                  {incident.title?.toLowerCase().includes('sos') && incident.status !== 'resolved' && (
                     <View style={styles.cardSosBadge}>
                       <View style={styles.sosLiveDot} />
                       <Text style={styles.cardSosBadgeText}>LIVE SOS</Text>
@@ -974,6 +1452,27 @@ export default function IncidentsScreen() {
                 <Text style={styles.incidentDescription} numberOfLines={2}>
                   {incident.description}
                 </Text>
+
+                {incident.images && incident.images.length > 0 && (
+                  <View style={styles.cardImageContainer}>
+                    {(() => {
+                      const incidentImages = (incident.images || []).filter(img => !img.helperValidationId);
+                      if (incidentImages.length === 0) return null;
+                      return incidentImages.slice(0, 4).map((img, idx) => (
+                        <View key={idx} style={{ position: 'relative' }}>
+                          <Image source={{ uri: img.url }} style={styles.cardThumbnail} />
+                          {idx === 3 && incidentImages.length > 4 && (
+                            <View style={styles.moreImagesOverlay}>
+                              <Text style={styles.moreImagesText}>
+                                +{incidentImages.length - 4}
+                              </Text>
+                            </View>
+                          )}
+                        </View>
+                      ));
+                    })()}
+                  </View>
+                )}
 
                 <View style={styles.incidentStats}>
                   <Text style={styles.incidentStat}>
@@ -1002,7 +1501,7 @@ export default function IncidentsScreen() {
                   </Text>
                 </View>
 
-                {incident.title?.toLowerCase().includes('sos') && (
+                {incident.title?.toLowerCase().includes('sos') && incident.status !== 'resolved' && (
                   <TouchableOpacity
                     style={styles.cardGoHelpBtn}
                     onPress={(e) => {
@@ -1017,6 +1516,20 @@ export default function IncidentsScreen() {
                     <Text style={styles.cardGoHelpBtnText}>Go to Help</Text>
                   </TouchableOpacity>
                 )}
+
+                <TouchableOpacity
+                  style={[styles.cardGoHelpBtn, { backgroundColor: '#3b82f6', marginTop: 6 }]}
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    router.navigate({
+                      pathname: "/",
+                      params: { focusIncidentId: incident.id }
+                    });
+                  }}
+                >
+                  <Ionicons name="map" size={14} color="#fff" />
+                  <Text style={styles.cardGoHelpBtnText}>Show on Map</Text>
+                </TouchableOpacity>
 
                 {incident.userId === user?.id && (
                   <View style={styles.cardActionRow}>
@@ -1252,6 +1765,37 @@ export default function IncidentsScreen() {
                     ))}
                   </View>
                 </Modal>
+
+                <View style={styles.imageUploadSection}>
+                  <Text style={styles.sectionLabel}>Incident Images</Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.imageScroll}>
+                    {editForm.images.map((url, idx) => (
+                      <View key={idx} style={styles.imageWrapper}>
+                        <Image source={{ uri: url }} style={styles.uploadedThumbnail} />
+                        <TouchableOpacity
+                          style={styles.removeImageBtn}
+                          onPress={() => handleRemoveImage(idx, true)}
+                        >
+                          <Ionicons name="close-circle" size={18} color="#dc2626" />
+                        </TouchableOpacity>
+                      </View>
+                    ))}
+                    {isUploadingImages && (
+                      <View style={[styles.imageWrapper, styles.imagePlaceholder]}>
+                        <ActivityIndicator size="small" color={AppColors.themeColor} />
+                        <Text style={styles.uploadingText}>Uploading...</Text>
+                      </View>
+                    )}
+                    <TouchableOpacity
+                      style={[styles.imageWrapper, styles.addImageBtn]}
+                      onPress={() => handleAddImages(true)}
+                      disabled={isUploadingImages}
+                    >
+                      <Ionicons name="camera" size={24} color={AppColors.themeColor} />
+                      <Text style={styles.addImageText}>Add Photos</Text>
+                    </TouchableOpacity>
+                  </ScrollView>
+                </View>
 
                 <View style={styles.locationSectionHeader}>
                   <Ionicons name="location" size={16} color={AppColors.themeColor} />
@@ -1887,5 +2431,356 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 12,
     fontWeight: 'bold',
+  },
+
+  // Truthfulness Verification Badges
+  truthBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    gap: 4,
+  },
+  truthBadgeText: {
+    color: '#ffffff',
+    fontSize: 11,
+    fontWeight: 'bold',
+  },
+
+  // Image Upload Form styles
+  imageUploadSection: {
+    marginBottom: 16,
+  },
+  sectionLabel: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: AppColors.foreground,
+    marginBottom: 8,
+  },
+  imageScroll: {
+    flexDirection: 'row',
+  },
+  imageWrapper: {
+    width: 80,
+    height: 80,
+    borderRadius: 8,
+    marginRight: 10,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  uploadedThumbnail: {
+    width: '100%',
+    height: '100%',
+  },
+  removeImageBtn: {
+    position: 'absolute',
+    top: 2,
+    right: 2,
+    zIndex: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.7)',
+    borderRadius: 9,
+  },
+  imagePlaceholder: {
+    backgroundColor: AppColors.surfaceSoft,
+    borderWidth: 1,
+    borderColor: AppColors.border,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderStyle: 'dashed',
+  },
+  uploadingText: {
+    fontSize: 10,
+    color: AppColors.muted,
+    marginTop: 4,
+  },
+  addImageBtn: {
+    backgroundColor: AppColors.surface,
+    borderWidth: 1,
+    borderColor: AppColors.border,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderStyle: 'dashed',
+  },
+  addImageText: {
+    fontSize: 10,
+    color: AppColors.themeColor,
+    fontWeight: '600',
+    marginTop: 4,
+  },
+
+  // Incident List Card Thumbnails
+  cardImageContainer: {
+    flexDirection: 'row',
+    gap: 6,
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  cardThumbnail: {
+    width: 60,
+    height: 60,
+    borderRadius: 6,
+    backgroundColor: AppColors.surfaceSoft,
+  },
+  moreImagesOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    borderRadius: 6,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  moreImagesText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+
+  // Incident Details Gallery
+  gallerySection: {
+    marginTop: 12,
+    marginBottom: 4,
+  },
+  galleryTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: AppColors.foreground,
+    marginBottom: 8,
+  },
+  galleryScroll: {
+    flexDirection: 'row',
+  },
+  galleryImage: {
+    width: 140,
+    height: 100,
+    borderRadius: 8,
+    marginRight: 10,
+    backgroundColor: AppColors.surfaceSoft,
+  },
+
+  // Fullscreen modal styles
+  fullscreenBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.95)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  fullscreenCloseBtn: {
+    position: 'absolute',
+    top: 40,
+    right: 20,
+    zIndex: 20,
+  },
+  fullscreenImage: {
+    width: '100%',
+    height: '80%',
+  },
+
+  // Helper Validation Panel in Detail View
+  valPanel: {
+    backgroundColor: AppColors.surface,
+    borderWidth: 1,
+    borderColor: AppColors.border,
+    borderRadius: 12,
+    padding: 16,
+    marginTop: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  valPanelHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 4,
+  },
+  valPanelTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: AppColors.foreground,
+  },
+  valPanelSubtitle: {
+    fontSize: 12,
+    color: AppColors.muted,
+    marginBottom: 12,
+  },
+  valVoteRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 12,
+  },
+  valVoteBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    borderRadius: 8,
+    gap: 6,
+    opacity: 0.6,
+  },
+  valVoteTrue: {
+    backgroundColor: '#16a34a',
+  },
+  valVoteTrueActive: {
+    opacity: 1,
+    borderWidth: 2,
+    borderColor: '#ffffff',
+    shadowColor: '#16a34a',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.4,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  valVoteFalse: {
+    backgroundColor: '#dc2626',
+  },
+  valVoteFalseActive: {
+    opacity: 1,
+    borderWidth: 2,
+    borderColor: '#ffffff',
+    shadowColor: '#dc2626',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.4,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  valVoteBtnText: {
+    color: '#ffffff',
+    fontSize: 13,
+    fontWeight: 'bold',
+  },
+  valCommentInput: {
+    backgroundColor: AppColors.background,
+    borderWidth: 1,
+    borderColor: AppColors.border,
+    borderRadius: 8,
+    padding: 10,
+    color: AppColors.foreground,
+    fontSize: 13,
+    minHeight: 60,
+    textAlignVertical: 'top',
+    marginBottom: 12,
+  },
+  valImageSection: {
+    marginBottom: 14,
+  },
+  valSubmitBtn: {
+    backgroundColor: AppColors.themeColor,
+    borderRadius: 8,
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  valSubmitBtnText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+
+  // Helper Verification Feed List
+  valFeedSection: {
+    marginTop: 24,
+  },
+  valFeedTitle: {
+    fontSize: 15,
+    fontWeight: 'bold',
+    color: AppColors.foreground,
+    marginBottom: 12,
+  },
+  emptyValFeed: {
+    backgroundColor: AppColors.surfaceSoft,
+    padding: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: AppColors.border,
+  },
+  emptyValText: {
+    fontSize: 13,
+    color: AppColors.foreground,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  emptyValSubtext: {
+    fontSize: 11,
+    color: AppColors.muted,
+    textAlign: 'center',
+  },
+  valFeedItem: {
+    backgroundColor: AppColors.surface,
+    borderWidth: 1,
+    borderColor: AppColors.border,
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 12,
+  },
+  valFeedItemHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  valAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: AppColors.surfaceSoft,
+  },
+  valResponderName: {
+    fontSize: 13,
+    fontWeight: 'bold',
+    color: AppColors.foreground,
+  },
+  valResponderEmail: {
+    fontSize: 10,
+    color: AppColors.muted,
+  },
+  feedVoteBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    gap: 4,
+  },
+  feedVoteTrue: {
+    backgroundColor: '#16a34a',
+  },
+  feedVoteFalse: {
+    backgroundColor: '#dc2626',
+  },
+  feedVoteText: {
+    color: '#ffffff',
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
+  valFeedComment: {
+    fontSize: 13,
+    color: AppColors.foreground,
+    lineHeight: 18,
+    marginBottom: 10,
+  },
+  valFeedImagesScroll: {
+    flexDirection: 'row',
+    marginBottom: 8,
+  },
+  valFeedProofImage: {
+    width: 90,
+    height: 70,
+    borderRadius: 6,
+    marginRight: 8,
+    backgroundColor: AppColors.surfaceSoft,
+  },
+  valDateText: {
+    fontSize: 10,
+    color: AppColors.muted,
+    alignSelf: 'flex-end',
   },
 });
